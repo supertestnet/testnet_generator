@@ -1,2 +1,2 @@
-# testnet_generator
+# Testnet generator
 Make your own bitcoin testnet
