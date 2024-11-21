@@ -779,7 +779,7 @@
                 var input_whose_script_treats_a_string_as_an_integer = -1;
                 var input_whose_script_tried_to_get_a_nonexistent_element_from_the_stack = -1;
                 var input_whose_script_failed_CLTV_due_to_not_enough_time_passed = -1;
-                var input_whose_script_uses_a_negative_number_for_CLTV = -1;
+                var input_whose_script_uses_a_negative_number_for_CLTV_or_CSV = -1;
                 var input_whose_locktime_value_does_not_match_the_CLTV_value = -1;
                 var input_whose_script_uses_CLTV_but_the_sequence_number_is_maxxed_out = -1;
                 var input_whose_script_failed_CSV = -1;
@@ -839,6 +839,7 @@
                                 break;
                             } else if ( mined_in_block ) {
                                 var num_of_blocks_since_parent = current_blockheight - mined_in_block;
+                                if ( num_of_blocks_since_parent > 0 ) num_of_blocks_since_parent = num_of_blocks_since_parent + 1;
                                 if ( num_of_blocks_since_parent < sequence_value ) {
                                     input_whose_script_failed_relative_timelock = index;
                                     break;
@@ -2265,7 +2266,7 @@
                                         return;
                                     }
                                     if ( input < 0 || ( input === 0 && testnet_generator.isZeroNegative( input ) ) ) {
-                                        input_whose_script_uses_a_negative_number_for_CLTV = index;
+                                        input_whose_script_uses_a_negative_number_for_CLTV_or_CSV = index;
                                         return;
                                     }
                                     if ( input >= 500000000 && locktime < 500000000 || locktime >= 500000000 && input < 500000000 ) {
@@ -2289,12 +2290,16 @@
                                         input_whose_script_treats_a_string_as_an_integer = index;
                                         return;
                                     }
-                                    if ( input < sequence ) {
+                                    if ( first_bit ) {
+                                        input_whose_script_failed_CSV = index;
+                                        return;
+                                    }
+                                    if ( sequence_value < input ) {
                                         input_whose_script_failed_CSV = index;
                                         return;
                                     }
                                     if ( input < 0 || ( input === 0 && testnet_generator.isZeroNegative( input ) ) ) {
-                                        input_whose_script_uses_a_negative_number_for_CLTV = index;
+                                        input_whose_script_uses_a_negative_number_for_CLTV_or_CSV = index;
                                         return;
                                     }
                                     if ( input >= 500000000 && locktime < 500000000 || locktime >= 500000000 && input < 500000000 ) {
@@ -2332,7 +2337,7 @@
                 //TODO: ensure outputs sum to less than or equal to inputs
                 //TODO: if the tx is non-standard, warn the user but give an option to anull standardness rules
                 if ( input_whose_script_failed_CLTV_due_to_not_enough_time_passed >= 0 ) return `that tx was invalid because input ${input_whose_script_failed_CLTV_due_to_not_enough_time_passed} has a script containing OP_CHECKLOCKTIMEVERIFY and not enough time passed or the locktime field was set lower than is required`;
-                if ( input_whose_script_uses_a_negative_number_for_CLTV >= 0 ) return `that tx was invalid because input ${input_whose_script_uses_a_negative_number_for_CLTV} has a script containing OP_CHECKLOCKTIMEVERIFY and tried to pass a negative number to it`;
+                if ( input_whose_script_uses_a_negative_number_for_CLTV_or_CSV >= 0 ) return `that tx was invalid because input ${input_whose_script_uses_a_negative_number_for_CLTV_or_CSV} has a script containing OP_CHECKLOCKTIMEVERIFY and tried to pass a negative number to it`;
                 if ( input_whose_locktime_value_does_not_match_the_CLTV_value >= 0 ) return `that tx was invalid because input ${input_whose_locktime_value_does_not_match_the_CLTV_value} has a locktime value does not match the value passed to OP_CHECKLOCKTIMEVERIFY in the script -- i.e. one of them a blockheight and the other is a unix timestamp`;
                 if ( input_whose_script_uses_CLTV_but_the_sequence_number_is_maxxed_out >= 0 ) return `that tx was invalid because input ${input_whose_script_uses_CLTV_but_the_sequence_number_is_maxxed_out} uses OP_CHECKLOCKTIMEVERIFY in the script but its sequence number is set to 0xffffffff -- this is not allowed, try setting the sequence number to 0xfffffffd or less`;
                 if ( input_whose_script_failed_CSV >= 0 ) return `that tx was invalid because input ${input_whose_script_failed_CSV} uses OP_CHECKSEQUENCEVERIFY in the script but its value is lower than the sequence number of that input`;
@@ -2408,7 +2413,7 @@
                 var keypairs = [testnet_generator.getAddy(), testnet_generator.getAddy(), testnet_generator.getAddy()];
                 var script = [
                     "OP_3",
-                    "OP_CHECKLOCKTIMEVERIFY",
+                    "OP_CHECKSEQUENCEVERIFY",
                     "OP_DROP",
                 ];
                 keypairs.forEach( ( keypair, idx ) => {
@@ -2437,7 +2442,7 @@
                     vin: [testnet_generator.getVin( txid, vout, amnt, addy )],
                     vout: [testnet_generator.getVout( amnt - 500, $( '.your_addy' ).innerText )],
                 });
-                txdata.locktime = 3;
+                txdata.vin[ 0 ].sequence = 3;
                 txdata.vin.forEach( ( input, index ) => {
                     // var sig_0 = tapscript.Signer.taproot.sign( keypairs[ 0 ][ 1 ], txdata, 0, { extension: tapleaf }).hex;
                     // sig_0 = ( BigInt( '0x' + sig_0 ) - BigInt( '0x01' ) ).toString( 16 );
