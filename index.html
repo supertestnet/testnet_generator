@@ -1,0 +1,2455 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, user-scalable=no">
+        <script src="https://unpkg.com/@dashincubator/ripemd160/ripemd160.js"></script>
+        <script src="https://unpkg.com/@cmdcode/tapscript@1.4.0"></script>
+        <script src="https://bundle.run/noble-secp256k1@1.2.14"></script>
+        <style>
+            * {
+                box-sizing: border-box;
+                font-size: 1.15rem;
+                font-family: Arial, sans-serif;
+            }
+            body {
+                margin: 0;
+            }
+            .inner_html {
+                max-width: 800px;
+                padding: 3rem 1rem;
+                margin: auto;
+                line-height: 1.25;
+                padding: 0;
+            }
+            .inner_body {
+                margin: 3rem 1rem;
+                word-wrap: break-word;
+            }
+            h1 {
+                font-size: 2rem;
+            }
+            h2, h2 * {
+                font-size: 1.5rem;
+            }
+            input, textarea {
+                line-height: 1.25;
+                width: 100%;
+                height: 1.8rem;
+                font-size: 1.15rem;
+                border: 1px solid grey;
+            }
+            textarea {
+                height: 10rem;
+            }
+            .hidden {
+                display: none !important;
+            }
+            .list_container {
+                overflow-y: scroll;
+            }
+            .no_blocks_msg {
+                height: 248px;
+                line-height: 248px;
+                text-align: center;
+            }
+            .list_of_blocks {
+                display: flex;
+                justify-content: center;
+            }
+            .block {
+                display: inline-block;
+                height: 11.5rem;
+                width: 192px;
+                margin: 1rem;
+                cursor: pointer;
+                overflow: hidden;
+                flex-shrink: 0;
+            }
+            .block:hover {
+                background-color: pink;
+            }
+            .block_inner {
+                display: inline-block;
+                position: relative;
+                height: 9.5rem;
+                width: 7.5rem;
+                margin: 1.5rem;
+            }
+            .block_back {
+                border: 1px solid black;
+                height: 6rem;
+                width: 6rem;
+                float: right;
+                display: inline;
+                background-color: #232838;
+                border-left: 0;
+                border-bottom: 0;
+            }
+            .block_front {
+                border: 1px solid black;
+                height: 6rem;
+                width: 6rem;
+                display: flex;
+                align-items: center;
+                position: absolute;
+                bottom: 2rem;
+                background-color: #3953c6;
+                color: white;
+                text-align: center;
+            }
+            .block_front div {
+                width: 100%;
+            }
+            .block_num {
+                position: absolute;
+                bottom: 0rem;
+                width: 80%;
+                text-align: center;
+            }
+            .wallet {
+                border: 1px solid black;
+                border-radius: 1rem;
+                padding: 1rem;
+                text-align: center;
+                margin-top: 1rem;
+            }
+            .auto_generate_label {
+                display: inline-block;
+            }
+            .wallet_btns, .broadcast_btn, .auto_generate_label,
+            .auto_go, .broadcast_success_label {
+                margin-top: 1rem;
+            }
+            .block_info, .tx_info_label, .addy_info_label {
+                display: flex;
+                justify-content: space-between;
+            }
+            .block_explorer, .tx, .input, .output,
+            .tx_explorer, .addy_explorer {
+                border: 1px solid black;
+                border-radius: 1rem;
+                padding: 1rem;
+                margin-bottom: 1rem;
+            }
+            .close_explorer {
+                cursor: pointer;
+            }
+            .explorer_block_num, .explorer_txid,
+            .explorer_addy, .close_explorer {
+                padding: 1rem;
+            }
+            .explorer_block_num,.explorer_addy,
+            .explorer_txid {
+                padding-left: 0;
+            }
+            .txid_link, .block_link, .addy_link {
+                color: blue;
+                text-decoration: underline;
+                cursor: pointer;
+            }
+            @media screen and (max-width: 600px) {
+            }
+        </style>
+        <script>
+            var $ = document.querySelector.bind( document );
+            var $$ = document.querySelectorAll.bind( document );
+            var url_params = new URLSearchParams( window.location.search );
+            var url_keys = url_params.keys();
+            var $_GET = {}
+            for ( var key of url_keys ) $_GET[ key ] = url_params.get( key );
+        </script>
+    </head>
+    <body>
+        <div class="list_container">
+            <div class="no_blocks_msg">Generate a block!</div>
+            <div class="list_of_blocks"></div>
+        </div>
+        <div class="inner_html">
+            <div class="inner_body">
+                <h1>Testnet generator</h1>
+                <div class="block_explorer hidden">
+                    <h2 class="block_info"><span class="explorer_block_num"></span><span class="close_explorer">&times;</span></h2>
+                    <p>Transaction count: <span class="tx_count">0</span></p>
+                    <p>Timestamp: <span class="block_timestamp">None</span></p>
+                    <p>Subsidy: <span class="block_subsidy">50 btc</span></p>
+                    <p>Fees: <span class="block_fees">0 btc</span></p>
+                    <p style="font-weight: bold;">Transactions</p>
+                    <div class="txs"></div>
+                </div>
+                <div class="tx_explorer hidden">
+                    <h2 class="tx_info_label"><span class="explorer_txid"></span><span class="close_explorer">&times;</span></h2>
+                    <p>Number of inputs: <span class="inputs_count">0</span></p>
+                    <p>Number of outputs: <span class="outputs_count">0</span></p>
+                    <p>Mined in block: <span class="mined_in_block">None</span></p>
+                    <p>Timestamp: <span class="tx_timestamp">None</span></p>
+                    <p>Tx size: <span class="tx_size">0 bytes</span></p>
+                    <p>Tx fee: <span class="tx_fee">0 btc</span></p>
+                    <p>Feerate: <span class="tx_feerate">0 sats per byte</span></p>
+                    <div class="tx_info"></div>
+                </div>
+                <div class="addy_explorer hidden">
+                    <h2 class="addy_info_label"><span class="explorer_addy"></span><span class="close_explorer">&times;</span></h2>
+                    <p class="full_address"></p>
+                    <p>Times this address received money: <span class="received_count">0</span></p>
+                    <p>Times this address sent money: <span class="sent_count">0</span></p>
+                    <p>Total amount received: <span class="total_received">0</span></p>
+                    <p>Total amount sent: <span class="total_sent">0</span></p>
+                    <p>Address balance: <span class="addy_balance">0</span></p>
+                    <div class="addy_tx_info"></div>
+                </div>
+                <div class="stuff_thats_not_an_explorer">
+                    <div><button class="generate_block">Generate block</button></div>
+                    <div class="auto_gen">
+                        <span class="auto_generate_label">Auto generator: </span>
+                        <select class="auto_generate">
+                            <option>--- Auto generate ---</option>
+                            <option>1/2 second</option>
+                            <option>1 second</option>
+                            <option>3 seconds</option>
+                            <option>5 seconds</option>
+                            <option>10 seconds</option>
+                            <option>30 seconds</option>
+                            <option>1 minute</option>
+                            <option>2 minutes</option>
+                            <option>5 minutes</option>
+                            <option>10 minutes</option>
+                        </select>
+                        <button class="auto_go" disabled>Go</button>
+                    </div>
+                    <div class="wallet">
+                        <h2>Your wallet</h2>
+                        <p>Your address:</p>
+                        <p class="your_addy"></p>
+                        <div class="balance_div">Balance: <span class="balance">0</span> btc</div>
+                        <div class="wallet_btns"><button class="send_btn">Send</button></div>
+                    </div>
+                    <h2 class="txs_in_mempool_label">Transactions in mempool: <span class="txs_in_mempool">0</span></h2>
+                    <p>Enter a transaction you want to broadcast</p>
+                    <textarea class="tx_broadcaster"></textarea>
+                    <div class="broadcast_btn"><button>Broadcast</button></div>
+                    <div class="broadcast_success_label hidden">Success: <span class="broadcast_success_txid txid_link"></span></div>
+                </div>
+            </div>
+        </div>
+        <script>
+            var testnet_generator = {
+                blocks: {},
+                utxo_set: {},
+                mempool: [],
+                utxos: {},
+                addresses: {},
+                hexToBytes: hex => Uint8Array.from( hex.match( /.{1,2}/g ).map( byte => parseInt( byte, 16 ) ) ),
+                bytesToHex: bytes => bytes.reduce( ( str, byte ) => str + byte.toString( 16 ).padStart( 2, "0" ), "" ),
+                getPrivkey: () => testnet_generator.bytesToHex( nobleSecp256k1.utils.randomPrivateKey() ),
+                getPubkey: privkey => nobleSecp256k1.getPublicKey( privkey, true ).substring( 2 ),
+                getAddy: () => {
+                    var privkey = testnet_generator.getPrivkey();
+                    var pubkey = testnet_generator.getPubkey( privkey );
+                    var addy = tapscript.Address.p2tr.fromPubKey( pubkey, "testnet" );
+                    return [ addy, privkey ];
+                },
+                intToHex: int => {
+                    var hex = BigInt( int ).toString( 16 );
+                    if ( hex.length % 2 ) hex = "0" + hex;
+                    return hex;
+                },
+                reverseHexString: s => s.match(/[a-fA-F0-9]{2}/g).reverse().join(''),
+                littleEndianSignedHexToDecimal: hex => {
+                  var rev = testnet_generator.reverseHexString( hex );
+                  var first_byte = rev.substring( 0, 2 );
+                  first_byte_as_decimal = parseInt( first_byte, 16 );
+                  if ( first_byte_as_decimal < 128 ) {
+                    return parseInt( rev, 16 );
+                  } else {
+                    //get the number of bytes in the hex string
+                    var num_of_bytes_in_hex_string = rev.length / 2;
+                    //get the corresponding max X-byte number 
+                    var maxnum = ( 2 ** ( num_of_bytes_in_hex_string * 8 ) );
+                    //halve it
+                    var maxnum_halved = maxnum / 2;
+                    //subtract the hex number from that
+                    return maxnum_halved - parseInt( rev, 16 );
+                  }
+                },
+                isValidHex: hex => {
+                    if ( !hex ) return;
+                    var length = hex.length;
+                    if ( length % 2 ) return;
+                    try {
+                        var bigint = BigInt( "0x" + hex, "hex" );
+                    } catch( e ) {
+                        return;
+                    }
+                    var prepad = bigint.toString( 16 );
+                    var i; for ( i=0; i<length; i++ ) prepad = "0" + prepad;
+                    var padding = prepad.slice( -Math.abs( length ) );
+                    return ( padding === hex );
+                },
+                isZeroNegative: zero => {
+                    var isZero = zero === 0;
+                    var isNegative = 1 / zero === -Infinity;
+                    return isNegative && isZero;
+                },
+                waitSomeTime: num => new Promise( resolve => setTimeout( resolve, num ) ),
+                sha256: s => {
+                    if ( typeof s == "string" ) s = new TextEncoder().encode( s );
+                    return crypto.subtle.digest( 'SHA-256', s ).then( hashBuffer => {
+                        var hashArray = Array.from( new Uint8Array( hashBuffer ) );
+                        var hashHex = hashArray
+                            .map( bytes => bytes.toString( 16 ).padStart( 2, '0' ) )
+                            .join( '' );
+                        return hashHex;
+                    });
+                },
+                sha1: s => {
+                    if ( typeof s == "string" ) s = new TextEncoder().encode( s );
+                    return crypto.subtle.digest( 'SHA-1', s ).then( hashBuffer => {
+                        var hashArray = Array.from( new Uint8Array( hashBuffer ) );
+                        var hashHex = hashArray
+                            .map( bytes => bytes.toString( 16 ).padStart( 2, '0' ) )
+                            .join( '' );
+                        return hashHex;
+                    });
+                },
+                rmd160: s => {
+                    if ( typeof s == "string" ) s = new TextEncoder().encode( s );
+                    var hash = RIPEMD160.create();
+                    hash.update( new Uint8Array( s ) );
+                    return testnet_generator.bytesToHex( hash.digest() );
+                },
+                getVin: ( txid, vout, amnt, addy ) => ({
+                    txid,
+                    vout,
+                    prevout: {
+                        value: amnt,
+                        scriptPubKey: tapscript.Address.toScriptPubKey( addy ),
+                    },
+                }),
+                getVout: ( amnt, addy ) => ({
+                    value: amnt,
+                    scriptPubKey: tapscript.Address.toScriptPubKey( addy ),
+                }),
+                satsToBitcoin: sats => {
+                    var btc = String( sats ).padStart( 8, "0" ).slice( 0,-8 ) + "." + String( sats ).padStart( 8, "0" ).slice( -8 );
+                    if ( btc.endsWith( "00000" ) ) {
+                        btc = btc.substring( 0, btc.length - 5 );
+                        var i; for ( i=0; i<5; i++ ) {
+                            if ( btc.endsWith( "0" ) ) btc = btc.substring( 0, btc.length - 1 );
+                        }
+                        if ( btc.endsWith( "." ) ) btc = btc.substring( 0, btc.length - 1 );
+                        if ( !btc ) btc = 0;
+                    }
+                    return btc;
+                },
+                showTx: ( txhex, idx ) => {
+                    if ( idx === undefined ) idx = 1;
+                    var txs_html = ``;
+                    var tx = tapscript.Tx.decode( txhex );
+                    var txid = tapscript.Tx.util.getTxid( tx );
+                    var display_fee = !!idx ? "" : "hidden";
+                    var tx_html = `
+                        <div class="tx">
+                            <div>Txid: <span class="txid txid_link" data-txhex="${txhex}" data-idx="${idx}">${txid}</span></div>
+                            <div class="${display_fee}">Fee: <span class="fee">0</span> btc</div>
+                            <div class="inputs"></div>
+                            <div class="outputs"></div>
+                        </div>
+                    `;
+                    var div = document.createElement( 'div' );
+                    div.innerHTML = tx_html;
+                    var inputs_html = ``;
+                    var outputs_html = ``;
+                    tx.vin.forEach( ( input, index ) => {
+                        if ( !index ) inputs_html = `<p style="text-align: center;">Inputs</p>`;
+                        var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
+                        if ( !idx ) var from_addy = "";
+                        else var from_addy = testnet_generator.utxo_set[ input_id ].addy;
+                        if ( !idx ) var amnt_sent = "";
+                        else var amnt_sent = testnet_generator.utxo_set[ input_id ].amnt;
+                        var input_txid = input[ "txid" ];
+                        var input_vout = input[ "vout" ];
+                        var input_idx = 0;
+                        if ( `${input[ "txid" ]}_${input[ "vout" ]}` in testnet_generator.utxo_set ) input_idx = testnet_generator.utxo_set[ `${input[ "txid" ]}_${input[ "vout" ]}` ][ "idx" ];
+                        if ( !idx ) var input_txhex = "";
+                        else var input_txhex = testnet_generator.utxo_set[ `${input[ "txid" ]}_${input[ "vout" ]}` ][ "txhex" ];
+                        if ( !idx ) inputs_html = inputs_html + `<div class="input">Coinbase</div>`;
+                        else inputs_html = inputs_html + `
+                            <div class="input">
+                                <p>"From" address: <span class="from_address addy_link">${from_addy}</span></p>
+                                <p>Amount sent from this address in this tx: <span class="amnt_sent">${testnet_generator.satsToBitcoin( amnt_sent )} btc</span></p>
+                                <p>Tx that originally created this input: <span class="input_txid txid_link" data-txhex="${input_txhex}" data-idx="${input_idx}">${input_txid}</span></p>
+                                <p>Vout of that tx: <span class="input_vout">${input[ "vout" ]}</span></p>
+                            </div>
+                        `;
+                    });
+                    div.getElementsByClassName( "inputs" )[ 0 ].innerHTML = inputs_html;
+                    tx.vout.forEach( ( output, index ) => {
+                        if ( !index ) outputs_html = `<p style="text-align: center;">Outputs</p>`;
+                        var output_id = `${txid}_${index}`;
+                        var addy = testnet_generator.utxo_set[ output_id ].addy;
+                        var amnt = testnet_generator.utxo_set[ output_id ].amnt;
+                        outputs_html = outputs_html + `
+                            <div class="output">
+                                <p>"To" address: <span class="to_address addy_link">${addy}</span></p>
+                                <p>Amount received by this address in this tx: <span class="amnt_received">${testnet_generator.satsToBitcoin( amnt )} btc</span></p>
+                            </div>
+                        `;
+                    });
+                    div.getElementsByClassName( "outputs" )[ 0 ].innerHTML = outputs_html;
+                    var sum_of_inputs = 0;
+                    tx.vin.forEach( input => {
+                        if ( !idx ) return;
+                        var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
+                        var amnt = testnet_generator.utxo_set[ input_id ].amnt;
+                        sum_of_inputs = sum_of_inputs + amnt;
+                    });
+                    var sum_of_outputs = 0;
+                    tx.vout.forEach( output => sum_of_outputs = sum_of_outputs + Number( output[ "value" ] ) );
+                    if ( !idx ) sum_of_outputs = 0;
+                    div.getElementsByClassName( "fee" )[ 0 ].innerText = testnet_generator.satsToBitcoin( sum_of_inputs - sum_of_outputs );
+                    txs_html = txs_html + div.innerHTML;
+                    return txs_html;
+                },
+                showSoloTx: ( txid, txhex, idx ) => {
+                    $( '.explorer_txid' ).innerText = `Tx ${txid.substring( 0, 4 )}...${txid.substring( txid.length - 4 )}`;
+                    $( '.tx_info' ).innerHTML = testnet_generator.showTx( txhex, idx );
+                    $$( '.close_explorer' ).forEach( close_btn => {
+                        close_btn.onclick = () => {
+                            showPage( 'stuff_thats_not_an_explorer' );
+                        }
+                    });
+                    var tx = tapscript.Tx.decode( txhex );
+                    var inputs_count = tx.vin.length;
+                    $( '.inputs_count' ).innerText = inputs_count;
+                    var outputs_count = tx.vout.length;
+                    $( '.outputs_count' ).innerText = outputs_count;
+                    if ( !isNaN( testnet_generator.utxo_set[ `${txid}_0` ].block_created ) ) {
+                        var mined_in_block = testnet_generator.utxo_set[ `${txid}_0` ].block_created;
+                        $( '.mined_in_block' ).innerHTML = `${mined_in_block} [<span class="block_link" data-blocknum="${mined_in_block}">view block</span>]`;
+                        $( '.block_link' ).onclick = e => {testnet_generator.showBlockDetails( e.target.getAttribute( "data-blocknum" ) )}
+                        var blockhash = testnet_generator.intToHex( mined_in_block ).padStart( 64, "0" );
+                        var timestamp = testnet_generator.blocks[ blockhash ][ "timestamp" ];
+                        $( '.tx_timestamp' ).innerText = String( new Date( timestamp * 1000 ) );
+                    } else {
+                        var mined_in_block = "not mined yet";
+                        $( '.mined_in_block' ).innerHTML = `${mined_in_block}`;
+                    }
+                    var tx_size = txhex.length / 2;
+                    $( '.tx_size' ).innerText = `${tx_size} bytes`;
+                    var sum_of_inputs = 0;
+                    tx.vin.forEach( input => {
+                        if ( !idx ) return;
+                        var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
+                        var amnt = testnet_generator.utxo_set[ input_id ].amnt;
+                        sum_of_inputs = sum_of_inputs + amnt;
+                    });
+                    var sum_of_outputs = 0;
+                    tx.vout.forEach( output => sum_of_outputs = sum_of_outputs + Number( output[ "value" ] ) );
+                    if ( !idx ) sum_of_outputs = 0;
+                    var tx_fee_in_sats = sum_of_inputs - sum_of_outputs;
+                    $( '.tx_fee' ).innerText = testnet_generator.satsToBitcoin( tx_fee_in_sats );
+                    $( '.tx_feerate' ).innerText = `${( tx_fee_in_sats / tx_size ).toFixed( 2 )} sats per byte`;
+                    window.scrollTo( 0, 0 );
+                    $$( '.txid_link' ).forEach( item => {
+                        item.onclick = e => {
+                            var txid = e.target.innerText;
+                            var txhex = e.target.getAttribute( "data-txhex" );
+                            var idx = Number( e.target.getAttribute( "data-idx" ) );
+                            showPage( 'tx_explorer' );
+                            testnet_generator.showSoloTx( txid, txhex, idx );
+                        }
+                    });
+                },
+                showAddyInfo: ( addy ) => {
+                    $( '.explorer_addy' ).innerText = `${addy.substring( 0, 4 )}...${addy.substring( addy.length - 4 )}`;
+                    $( '.full_address' ).innerText = addy;
+                    $( '.received_count' ).innerText = testnet_generator.addresses[ addy ].received.length;
+                    $( '.sent_count' ).innerText = testnet_generator.addresses[ addy ].sent.length;
+                    var sent = [];
+                    var total_sent = 0;
+                    var total_sent_to_self = 0;
+                    testnet_generator.addresses[ addy ].sent.forEach( input_id => {
+                        var txhex = testnet_generator.utxo_set[ input_id.substring( 0, 65 ) + "0" ].txhex;
+                        sent.push( [ txhex, 1, undefined ] );
+                        var tx = tapscript.Tx.decode( txhex );
+                        var input_i_seek = Number( input_id.substring( 65 ) );
+                        var input = tx.vin[ input_i_seek ];
+                        var utxo_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
+                        var recipients = [];
+                        tx.vout.forEach( ( vout, index ) => {
+                            var recipient = tapscript.Address.fromScriptPubKey( vout[ "scriptPubKey" ], "testnet" );
+                            if ( recipient !== addy ) return;
+                            total_sent_to_self = total_sent_to_self + Number( vout[ "value" ] );
+                        });
+                        var txinfo = testnet_generator.utxo_set[ utxo_id ];
+                        total_sent = total_sent + txinfo.amnt;
+                    });
+                    $( '.total_sent' ).innerText = `${testnet_generator.satsToBitcoin( total_sent - total_sent_to_self )} btc`;
+                    var received = [];
+                    var total_received = 0;
+                    testnet_generator.addresses[ addy ].received.forEach( output_id => {
+                        var txinfo = testnet_generator.utxo_set[ output_id ];
+                        received.push( [ txinfo.txhex, txinfo.idx, txinfo.block_created ] );
+                        total_received = total_received + txinfo.amnt;
+                    });
+                    $( '.total_received' ).innerText = `${testnet_generator.satsToBitcoin( total_received - total_sent_to_self )} btc`;
+                    $( '.addy_balance' ).innerText = `${testnet_generator.satsToBitcoin( ( total_received - total_sent_to_self ) - ( total_sent - total_sent_to_self ) )} btc`;
+                    var txs_html = `<p style="text-align: center; font-weight: bold;">Transactions where this address received money</p>`;
+                    received.forEach( tx => {
+                        var [ txhex, idx, blocknum ] = tx;
+                        txs_html = txs_html + testnet_generator.showTx( txhex, idx, blocknum );
+                    });
+                    txs_html = txs_html + `<p style="text-align: center; font-weight: bold;">Transactions where this address sent money</p>`;
+                    sent.forEach( tx => {
+                        var [ txhex, idx, blocknum ] = tx;
+                        txs_html = txs_html + testnet_generator.showTx( txhex, idx, blocknum );
+                    });
+                    $( '.addy_tx_info' ).innerHTML = txs_html;
+                    $$( '.close_explorer' ).forEach( close_btn => {
+                        close_btn.onclick = () => {
+                            showPage( 'stuff_thats_not_an_explorer' );
+                        }
+                    });
+                    window.scrollTo( 0, 0 );
+                    $$( '.txid_link' ).forEach( item => {
+                        item.onclick = e => {
+                            var txid = e.target.innerText;
+                            var txhex = e.target.getAttribute( "data-txhex" );
+                            var idx = Number( e.target.getAttribute( "data-idx" ) );
+                            showPage( 'tx_explorer' );
+                            testnet_generator.showSoloTx( txid, txhex, idx );
+                        }
+                    });
+                },
+                showBlockDetails: num => {
+                    var blockhash = testnet_generator.intToHex( num ).padStart( 64, "0" );
+                    var timestamp = testnet_generator.blocks[ blockhash ][ "timestamp" ];
+                    var txs = testnet_generator.blocks[ blockhash ][ "txs" ];
+                    showPage( 'block_explorer' );
+                    $( '.explorer_block_num' ).innerText = `Block ${num}`;
+                    $$( '.close_explorer' ).forEach( close_btn => {
+                        close_btn.onclick = () => {
+                            showPage( 'stuff_thats_not_an_explorer' );
+                        }
+                    });
+                    $( '.tx_count' ).innerText = txs.length;
+                    $( '.block_timestamp' ).innerText = String( new Date( timestamp * 1000 ) );
+                    $( '.block_fees' ).innerText = `${testnet_generator.satsToBitcoin( testnet_generator.blocks[ blockhash ][ "fees" ] )} btc`;
+                    var txs_html = ``;
+                    txs.forEach( ( txhex, idx ) => {
+                        txs_html = txs_html + testnet_generator.showTx( txhex, idx, num );
+                    });
+                    $( '.txs' ).innerHTML = txs_html;
+                    $$( '.txid_link' ).forEach( item => {
+                        item.onclick = e => {
+                            var txid = e.target.innerText;
+                            var txhex = e.target.getAttribute( "data-txhex" );
+                            var idx = Number( e.target.getAttribute( "data-idx" ) );
+                            showPage( 'tx_explorer' );
+                            testnet_generator.showSoloTx( txid, txhex, idx, num );
+                        }
+                    });
+                    $$( '.addy_link' ).forEach( item => {
+                        item.onclick = e => {
+                            var addy = e.target.innerText;
+                            showPage( 'addy_explorer' );
+                            testnet_generator.showAddyInfo( addy );
+                        }
+                    });
+                },
+            }
+            var makeBlock = () => {
+                var num = 0;
+                if ( $( '.block_num' ) ) num = Number( $$( '.block_num' )[ $$( '.block_num' ).length - 1 ].innerText ) + 1;
+                var generated_txid = testnet_generator.intToHex( num ).padStart( 64, "0" );
+                var vout = 0;
+                var amnt = 50 * 100_000_000;
+                var fees_from_mempool = 0;
+                testnet_generator.mempool.forEach( ( tx, idx ) => {
+                    var sum_of_inputs = 0;
+                    tx = tapscript.Tx.decode( tx );
+                    var txid = tapscript.Tx.util.getTxid( tx );
+                    tx.vin.forEach( input => {
+                        var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
+                        var amnt = testnet_generator.utxo_set[ input_id ].amnt;
+                        sum_of_inputs = sum_of_inputs + amnt;
+                        testnet_generator.utxo_set[ input_id ].spent = true;
+                        testnet_generator.utxo_set[ input_id ].block_spent = num;
+                    });
+                    var sum_of_outputs = 0;
+                    tx.vout.forEach( ( output, index ) => {
+                        sum_of_outputs = sum_of_outputs + Number( output[ "value" ] );
+                        testnet_generator.utxo_set[ `${txid}_${index}` ] = {
+                            txid,
+                            vout: index,
+                            amnt: Number( output[ "value" ] ),
+                            addy: tapscript.Address.fromScriptPubKey( output[ "scriptPubKey" ], "testnet" ),
+                            spent: false,
+                            txhex: tapscript.Tx.encode( tx ).hex,
+                            idx: idx + 1,
+                            block_created: num,
+                            block_spent: undefined,
+                        }
+                    });
+                    fees_from_mempool = fees_from_mempool + sum_of_inputs - sum_of_outputs;
+                });
+                amnt = amnt + fees_from_mempool;
+                var privkey = $( '.your_addy' ).getAttribute( "data-privkey" );
+                var to_pubkey = testnet_generator.getPubkey( privkey );
+                var to_addy = tapscript.Address.p2tr.fromPubKey( to_pubkey, "testnet" );
+                var from_pubkey = "00".repeat( 32 );
+                var from_addy = tapscript.Address.p2tr.fromPubKey( from_pubkey, "testnet" );
+                var txdata = tapscript.Tx.create({
+                    vin: [testnet_generator.getVin( generated_txid, vout, amnt, from_addy )],
+                    vout: [testnet_generator.getVout( amnt, to_addy )],
+                });
+                var txid = tapscript.Tx.util.getTxid( txdata );
+                var txs = [ tapscript.Tx.encode( txdata ).hex ];
+                txs = [ ...txs, ...testnet_generator.mempool ];
+                testnet_generator.mempool = [];
+                testnet_generator.blocks[ generated_txid ] = {
+                    timestamp: Math.floor( Date.now() / 1000 ),
+                    fees: fees_from_mempool,
+                    txs,
+                }
+                testnet_generator.utxo_set[ `${txid}_${vout}` ] = {
+                    txid,
+                    vout,
+                    amnt,
+                    addy: to_addy,
+                    spent: false,
+                    txhex: tapscript.Tx.encode( txdata ).hex,
+                    idx: 0,
+                    block_created: num,
+                    block_spent: undefined,
+                }
+                var output_id = `${txid}_${vout}`;
+                if ( !( to_addy in testnet_generator.addresses ) ) testnet_generator.addresses[ to_addy ] = {
+                    sent: [],
+                    received: [],
+                }
+                testnet_generator.addresses[ to_addy ][ "received" ].push( output_id );
+                var utxo_id = testnet_generator.getPrivkey().substring( 0, 16 );
+                calcBalance();
+                showBlock( num, testnet_generator.blocks[ generated_txid ].txs.length );
+                calcMempool();
+            }
+            var showBlock = ( num, count ) => {
+                var div = document.createElement( "div" );
+                div.innerHTML = `
+                    <div class="block">
+                        <div class="block_inner">
+                            <div class="block_back"></div>
+                            <div class="block_front"><div>tx count:<br>${count}</div></div>
+                            <div class="block_num">${num}</div>
+                        </div>
+                    </div>
+                `;
+                var block = div.firstElementChild;
+                if ( $( '.block' ) ) {
+                    var blockwidth = 229;
+                    var desired_width = Math.max( ( blockwidth * ( $$( '.block' ).length + 1 ) ), window.innerWidth );
+                    $( '.list_of_blocks' ).style.width = desired_width + "px";
+                    $( '.list_container' ).scrollTo({
+                        top: 0,
+                        left: $( '.list_of_blocks' ).offsetWidth,
+                        behavior: "smooth",
+                    });
+                }
+                $( '.no_blocks_msg' ).classList.add( "hidden" );
+                block.onclick = () => {testnet_generator.showBlockDetails( num );}
+                $( '.list_of_blocks' ).append( block );
+            }
+            var calcBalance = () => {
+                var bal = 0;
+                var my_utxos = {}
+                Object.keys( testnet_generator.utxo_set ).forEach( utxo_id => {
+                    if ( testnet_generator.utxo_set[ utxo_id ].spent ) return;
+                    var utxo = testnet_generator.utxo_set[ utxo_id ];
+                    if ( utxo[ "addy" ] === $( '.your_addy' ).innerText ) {
+                        bal = bal + utxo[ "amnt" ];
+                        my_utxos[ utxo_id ] = {
+                            utxo_id,
+                            txid: utxo[ "txid" ],
+                            vout: utxo[ "vout" ],
+                            amnt: utxo[ "amnt" ],
+                            addy: utxo[ "addy" ],
+                            skey: $( '.your_addy' ).getAttribute( "data-privkey" ),
+                        }
+                    }
+                });
+                testnet_generator.utxos = my_utxos;
+                $( '.balance' ).innerText = testnet_generator.satsToBitcoin( bal );
+            }
+            $( '.generate_block' ).onclick = makeBlock;
+            var showAddress = () => {
+                var [ addy, privkey ] = testnet_generator.getAddy();
+                $( '.your_addy' ).innerText = addy;
+                $( '.your_addy' ).setAttribute( "data-privkey", privkey );
+            }
+            var sendMoney = () => {
+                var destino = prompt( `enter the address you want to send money to` );
+                if ( !destino ) return;
+                var amnt = Number( prompt( `enter an amount of sats you want to send there` ) );
+                if ( !amnt ) return;
+                var feerate = Number( prompt( `enter the feerate you want to use` ) );
+                if ( !feerate ) return;
+                var txfee = 300 * feerate;
+                var input_ids = getUtxos( amnt + txfee );
+                if ( input_ids === "unable" ) return alert( `you don't have enough money, consider generating some blocks` );
+                var inputs = [];
+                input_ids.forEach( utxo_id => inputs.push( testnet_generator.utxos[ utxo_id ] ) );
+                var vin = [];
+                inputs.forEach( input => vin.push( testnet_generator.getVin( input[ "txid" ], input[ "vout" ], input[ "amnt" ], input[ "addy" ] ) ) );
+                var txdata = tapscript.Tx.create({
+                    vin,
+                    vout: [testnet_generator.getVout( amnt, destino )],
+                });
+                var sum_of_inputs = 0;
+                inputs.forEach( input => sum_of_inputs = sum_of_inputs + input[ "amnt" ] );
+                var change = sum_of_inputs - amnt - txfee;
+                var change_addy = $( '.your_addy' ).innerText;
+                if ( change > 330 ) txdata.vout.push( testnet_generator.getVout( change, change_addy ) );
+                var i; for ( i=0; i<txdata.vin.length; i++ ) {
+                    var privkey = inputs[ i ][ "skey" ];
+                    var sig = tapscript.Signer.taproot.sign( privkey, txdata, i ).hex;
+                    txdata.vin[ i ].witness = [ sig ];
+                }
+                var txhex = tapscript.Tx.encode( txdata ).hex;
+                broadcast( txhex );
+                //highlight the mempool count label
+                $( '.txs_in_mempool_label' ).style.backgroundColor = "pink";
+                setTimeout( () => {
+                    $( '.txs_in_mempool_label' ).style.transition = "all 1s ease-in";
+                    $( '.txs_in_mempool_label' ).style.backgroundColor = "white";
+                }, 10 );
+                calcMempool();
+                return txhex;
+            }
+            $( '.send_btn' ).onclick = sendMoney;
+            var getUtxos = amount => {
+                var utxo_set = [];
+                Object.keys( testnet_generator.utxos ).forEach( utxo_id => utxo_set.push( testnet_generator.utxos[ utxo_id ] ) );
+                var set_to_return = [];
+                var sum_so_far = 0;
+                var new_utxo_set = JSON.parse( JSON.stringify( utxo_set ) );
+                var unable = false;
+                var loop = () => {
+                    if ( !new_utxo_set.length ) {
+                        unable = true;
+                        return;
+                    }
+                    var rand = Math.floor( Math.random() * new_utxo_set.length );
+                    set_to_return.push( new_utxo_set[ rand ][ "utxo_id" ] );
+                    sum_so_far = sum_so_far + new_utxo_set[ rand ][ "amnt" ];
+                    new_utxo_set.splice( rand, 1 );
+                    if ( sum_so_far < amount + 330 ) loop();
+                }
+                loop();
+                if ( unable ) return `unable`;
+                return set_to_return;
+            }
+            showAddress();
+            var validateTx = async txhex => {
+                var tx = null;
+                try {
+                    tx = tapscript.Tx.decode( txhex );
+                } catch ( e ) {}
+                if ( !tx || typeof tx != "object" ) return 'that tx was invalid for unknown reasons';
+                var input_that_isnt_real = -1;
+                var input_with_insufficient_witness_length = -1;
+                var input_with_invalid_sig = -1;
+                var input_whose_stack_is_too_small = -1;
+                var input_with_improperly_formatted_sig = -1;
+                var input_with_improperly_formatted_element = -1;
+                var input_with_improperly_formatted_element = -1;
+                var input_whose_script_failed_a_verify_opcode = -1;
+                var input_with_op_nop = -1;
+                var input_whose_script_left_multiple_elements_on_the_stack = -1;
+                var input_whose_script_ended_on_false = -1;
+                var input_with_if_branch_preceded_by_something_other_than_1_or_0 = -1;
+                var input_with_script_containing_op_return = -1;
+                var input_whose_script_treats_a_string_as_an_integer = -1;
+                var input_whose_script_tried_to_get_a_nonexistent_element_from_the_stack = -1;
+                var input_whose_script_failed_CLTV_due_to_not_enough_time_passed = -1;
+                var input_whose_script_uses_a_negative_number_for_CLTV = -1;
+                var input_whose_locktime_value_does_not_match_the_CLTV_value = -1;
+                var input_whose_script_uses_CLTV_but_the_sequence_number_is_maxxed_out = -1;
+                var input_whose_script_failed_CSV = -1;
+                var i; for ( i=0; i<tx.vin.length; i++ ) {
+                    var input = tx.vin[ i ];
+                    var index = i;
+                    var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
+                    var input_exists = false;
+                    if ( input_id in testnet_generator.utxo_set ) input_exists = true;
+                    else input_exists = false;
+                    if ( testnet_generator.utxo_set[ input_id ].spent ) input_exists = false;
+                    if ( !input_exists ) {
+                        input_that_isnt_real = index;
+                        break;
+                    }
+                    var addy = testnet_generator.utxo_set[ input_id ].addy;
+                    tx.vin[ i ].prevout = {
+                        value: testnet_generator.utxo_set[ input_id ].amnt,
+                        scriptPubKey: tapscript.Address.toScriptPubKey( addy ),
+                    }
+                }
+                if ( input_that_isnt_real >= 0 ) return `that tx was invalid because input ${input_that_isnt_real} tries to spend a utxo that does not exist or is already spent by another transaction in the mempool`;
+                //note: locktime is encoded as little endian
+                var locktime = tx.locktime;
+                var blockheight = Object.keys( testnet_generator.blocks ).length - 1;
+                if ( locktime < 500000000 && locktime > blockheight ) return `that tx was invalid because its locktime is set to a value greater than the current blockheight -- wait longer! The current blockheight is ${blockheight} and your locktime is set to ${locktime} so you need to wait til then`;
+                var current_block = Object.keys( testnet_generator.blocks ).sort()[ Object.keys( testnet_generator.blocks ).sort().length - 1 ];
+                var current_blocktime = testnet_generator.blocks[ current_block ].timestamp;
+                if ( locktime >= 500000000 && locktime > current_blocktime ) return `that tx was invalid because its locktime is set to a value greater than the median timestamp of the last 11 blocks (actually in this implementation I don't do the median stuff, I just check the latest block's timestamp) -- wait longer! The current timestamp is ${current_blocktime} (which is ${String( new Date( current_blocktime * 1000 ) )}) and your locktime is set to ${locktime} (which is ${String( new Date( locktime * 1000 ) )}) so you need to wait til then`;
+                var i; for ( i=0; i<tx.vin.length; i++ ) {
+                    var input = tx.vin[ i ];
+                    var index = i;
+                    var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
+                    var addy = testnet_generator.utxo_set[ input_id ].addy;
+                    var type = tapscript.Address.decode( addy ).type;
+                    //note: sequence is encoded as little endian
+                    var sequence = testnet_generator.littleEndianSignedHexToDecimal( input.sequence );
+                    if ( type === "p2tr" ) {
+                        //ensure at least one element exists on the witness stack
+                        if ( !input.witness.length ) {
+                            input_with_insufficient_witness_length = index;
+                            break;
+                        }
+                        //if only one element exists on the witness stack, treat it as a sig and check that it is valid for the taproot address when treated as a pubkey
+                        if ( input.witness.length === 1 ) {
+                            var sig = input.witness[ 0 ];
+                            var sighash = tapscript.Signer.taproot.hash( tx, index );
+                            var pubkey = tapscript.Address.decode( addy ).script[ 1 ];
+                            var sig_is_valid = await nobleSecp256k1.schnorr.verify( sig, sighash, pubkey );
+                            if ( !sig_is_valid ) input_with_invalid_sig = index;
+                        } else {
+                            //if there are multiple elements on the witness stack, treat the second-to-last element as the script and execute it with the elements prior to that as params
+                            var script = input.witness[ input.witness.length - 2 ];
+                            var params = [];
+                            input.witness.forEach( ( element, element_index ) => {
+                                if ( element_index < input.witness.length - 2 ) params.push( element );
+                            });
+                            var script_as_asm = tapscript.Script.fmt.toAsm( script );
+                            var tapleaf = tapscript.Tap.encodeScript( script_as_asm );
+                            var ifs_stack = [true];
+                            var alt_stack = [];
+                            console.log( "params:" );
+                            console.log( params );
+                            console.log( "script:" );
+                            console.log( script_as_asm );
+                            var exeloop = async () => {
+                                var element = script_as_asm[ 0 ];
+                                console.log( element );
+                                if ( !ifs_stack.includes( false ) && !element.startsWith( "OP_" ) ) {
+                                    if ( !testnet_generator.isValidHex( element ) && element !== "" ) {
+                                        input_with_improperly_formatted_element = index;
+                                        return;
+                                    }
+                                    //if the element is 0, push 0
+                                    if ( element === "" ) element = 0;
+                                    //convert hex values less than 4 bytes to the corresponding number
+                                    if ( element !== 0 && element.length / 2 < 5 ) element = testnet_generator.littleEndianSignedHexToDecimal( element );
+                                    params.push( element );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_CHECKSIG" ) {
+                                    // console.log( "params:" );
+                                    // console.log( JSON.parse( JSON.stringify( params ) ) );
+                                    // console.log( "script:" );
+                                    // console.log( JSON.parse( JSON.stringify( script_as_asm ) ) );
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var pubkey = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var sig = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    // console.log( "pubkey:" );
+                                    // console.log( pubkey );
+                                    // console.log( "sig:" );
+                                    // console.log( sig );
+                                    var sig_length_is_good = false;
+                                    if ( sig.length === 128 || sig.length === 130 || !sig.length ) sig_length_is_good = true;
+                                    if ( sig.length === 130 && sig.substring( 128 ) != "01" && sig.substring( 128 ) != "02" && sig.substring( 128 ) != "03" && sig.substring( 128 ) != "81" && sig.substring( 128 ) != "82" && sig.substring( 128 ) != "83" ) sig_length_is_good = false;
+                                    if ( !sig_length_is_good || ( sig.length && !testnet_generator.isValidHex( sig ) ) ) input_with_improperly_formatted_sig = index;
+                                    if ( !sig.length ) {
+                                        params.push( 0 );
+                                    } else {
+                                        var sigflag = 1; //sighash_all
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "02" ) sigflag = 2; //sighash_single
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "03" ) sigflag = 3; //sighash_none
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "81" ) sigflag = 128 | 1; //sighash_all | anyone_can_pay
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "82" ) sigflag = 128 | 2; //sighash_single | anyone_can_pay
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "83" ) sigflag = 128 | 3; //sighash_none | anyone_can_pay
+                                        if ( sigflag != 1 ) var sighash = tapscript.Signer.taproot.hash( tx, index, { extension: tapleaf, sigflag }).hex;
+                                        else var sighash = tapscript.Signer.taproot.hash( tx, index, { extension: tapleaf } ).hex;
+                                        var sig_is_valid = await nobleSecp256k1.schnorr.verify( sig, sighash, pubkey );
+                                        if ( sig_is_valid ) {
+                                            params.push( 1 );
+                                        }
+                                        else {
+                                            input_with_invalid_sig = index;
+                                            return;
+                                        }
+                                    }
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_CHECKSIGVERIFY" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var pubkey = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var sig = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    var sig_length_is_good = false;
+                                    if ( sig.length === 128 || sig.length === 130 || !sig.length ) sig_length_is_good = true;
+                                    if ( sig.length === 130 && sig.substring( 128 ) != "01" && sig.substring( 128 ) != "02" && sig.substring( 128 ) != "03" && sig.substring( 128 ) != "81" && sig.substring( 128 ) != "82" && sig.substring( 128 ) != "83" ) sig_length_is_good = false;
+                                    if ( !sig_length_is_good || ( sig.length && !testnet_generator.isValidHex( sig ) ) ) input_with_improperly_formatted_sig = index;
+                                    if ( !sig.length ) {
+                                        input_whose_script_failed_a_verify_opcode = index;
+                                        return;
+                                    } else {
+                                        var sigflag = 1; //sighash_all
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "02" ) sigflag = 2; //sighash_single
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "03" ) sigflag = 3; //sighash_none
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "81" ) sigflag = 128 | 1; //sighash_all | anyone_can_pay
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "82" ) sigflag = 128 | 2; //sighash_single | anyone_can_pay
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "83" ) sigflag = 128 | 3; //sighash_none | anyone_can_pay
+                                        if ( sigflag != 1 ) var sighash = tapscript.Signer.taproot.hash( tx, index, { extension: tapleaf, sigflag }).hex;
+                                        else var sighash = tapscript.Signer.taproot.hash( tx, index, { extension: tapleaf } ).hex;
+                                        var sig_is_valid = await nobleSecp256k1.schnorr.verify( sig, sighash, pubkey );
+                                        if ( !sig_is_valid ) {
+                                            input_whose_script_failed_a_verify_opcode = index;
+                                            return;
+                                        }
+                                    }
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_CHECKSIGADD" ) {
+                                    // console.log( "params:" );
+                                    // console.log( params );
+                                    // console.log( "script:" );
+                                    // console.log( script_as_asm );
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var pubkey = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var num_to_add_to = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var sig = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    var sig_length_is_good = false;
+                                    if ( sig.length === 128 || sig.length === 130 || !sig.length ) sig_length_is_good = true;
+                                    if ( sig.length === 130 && sig.substring( 128 ) != "01" && sig.substring( 128 ) != "02" && sig.substring( 128 ) != "03" && sig.substring( 128 ) != "81" && sig.substring( 128 ) != "82" && sig.substring( 128 ) != "83" ) sig_length_is_good = false;
+                                    if ( !sig_length_is_good || ( sig.length && !testnet_generator.isValidHex( sig ) ) ) input_with_improperly_formatted_sig = index;
+                                    // console.log( "num_to_add_to:", num_to_add_to, "pubkey:", pubkey, "sig:", sig );
+                                    if ( !sig.length ) {
+                                        params.push( num_to_add_to );
+                                    } else {
+                                        var sigflag = 1; //sighash_all
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "02" ) sigflag = 2; //sighash_single
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "03" ) sigflag = 3; //sighash_none
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "81" ) sigflag = 128 | 1; //sighash_all | anyone_can_pay
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "82" ) sigflag = 128 | 2; //sighash_single | anyone_can_pay
+                                        if ( sig.length === 130 && sig.substring( 128 ) != "83" ) sigflag = 128 | 3; //sighash_none | anyone_can_pay
+                                        if ( sigflag != 1 ) var sighash = tapscript.Signer.taproot.hash( tx, index, { extension: tapleaf, sigflag }).hex;
+                                        else var sighash = tapscript.Signer.taproot.hash( tx, index, { extension: tapleaf } ).hex;
+                                        var sig_is_valid = await nobleSecp256k1.schnorr.verify( sig, sighash, pubkey );
+                                        // console.log( "sig is valid, right?", sig_is_valid, "pubkey:", pubkey, "sighash:", sighash, "sig:", sig );
+                                        if ( sig_is_valid ) {
+                                            // console.log( 'I will increment this:', num_to_add_to );
+                                            num_to_add_to = num_to_add_to + 1;
+                                            params.push( num_to_add_to );
+                                            // console.log( 'done, now it is this:', num_to_add_to );
+                                        } else {
+                                            input_with_invalid_sig = index;
+                                            return;
+                                        }
+                                    }
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_0" || element === "OP_FALSE" || element === "" ) {
+                                    params.push( 0 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_1" || element === "OP_TRUE" ) {
+                                    params.push( 1 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_2" ) {
+                                    params.push( 2 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_3" ) {
+                                    params.push( 3 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_4" ) {
+                                    params.push( 4 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_5" ) {
+                                    params.push( 5 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_6" ) {
+                                    params.push( 6 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_7" ) {
+                                    params.push( 7 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_8" ) {
+                                    params.push( 8 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_9" ) {
+                                    params.push( 9 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_10" ) {
+                                    params.push( 10 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_11" ) {
+                                    params.push( 11 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_12" ) {
+                                    params.push( 12 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_13" ) {
+                                    params.push( 13 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_14" ) {
+                                    params.push( 14 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_15" ) {
+                                    params.push( 15 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_16" ) {
+                                    params.push( 16 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_EQUAL" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( item_2 === item_1 ) params.push( 1 );
+                                    else params.push( 0 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_EQUALVERIFY" ) {
+                                    // console.log( "params:" );
+                                    // console.log( params );
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( item_2 !== item_1 ) {
+                                        input_whose_script_failed_a_verify_opcode = index;
+                                        return;
+                                    }
+                                    // console.log( "params:" );
+                                    // console.log( params );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_GREATERTHAN" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var num_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var num_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( num_2 > num_1 ) params.push( 1 );
+                                    else params.push( 0 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_LESSTHAN" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var num_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var num_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( num_2 < num_1 ) params.push( 1 );
+                                    else params.push( 0 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_GREATERTHANOREQUAL" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var num_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var num_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    // console.log( num_2, num_1, "the first number should be greater than or equal to the second number" );
+                                    if ( num_2 >= num_1 ) params.push( 1 );
+                                    else params.push( 0 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_LESSTHANOREQUAL" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var num_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var num_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( num_2 <= num_1 ) params.push( 1 );
+                                    else params.push( 0 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_SHA1" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_hash = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof item_to_hash === "string" ) var as_bytes = testnet_generator.hexToBytes( item_to_hash );
+                                    else {
+                                        item_to_hash = item_to_hash.toString( 16 );
+                                        if ( item_to_hash % 2 ) item_to_hash = "0" + item_to_hash;
+                                        var as_bytes = testnet_generator.hexToBytes( item_to_hash );
+                                    }
+                                    var hashed = await testnet_generator.sha1( as_bytes );
+                                    params.push( hashed );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_SHA256" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_hash = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof item_to_hash === "string" ) var as_bytes = testnet_generator.hexToBytes( item_to_hash );
+                                    else {
+                                        item_to_hash = item_to_hash.toString( 16 );
+                                        if ( item_to_hash % 2 ) item_to_hash = "0" + item_to_hash;
+                                        var as_bytes = testnet_generator.hexToBytes( item_to_hash );
+                                    }
+                                    var hashed = await testnet_generator.sha256( as_bytes );
+                                    params.push( hashed );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_HASH256" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_hash = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof item_to_hash === "string" ) var as_bytes = testnet_generator.hexToBytes( item_to_hash );
+                                    else {
+                                        item_to_hash = item_to_hash.toString( 16 );
+                                        if ( item_to_hash % 2 ) item_to_hash = "0" + item_to_hash;
+                                        var as_bytes = testnet_generator.hexToBytes( item_to_hash );
+                                    }
+                                    var hashed = await testnet_generator.sha256( as_bytes );
+                                    var as_bytes = testnet_generator.hexToBytes( hashed );
+                                    hashed = await testnet_generator.sha256( as_bytes );
+                                    params.push( hashed );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_RIPEMD160" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_hash = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof item_to_hash === "string" ) var as_bytes = testnet_generator.hexToBytes( item_to_hash );
+                                    else {
+                                        item_to_hash = item_to_hash.toString( 16 );
+                                        if ( item_to_hash % 2 ) item_to_hash = "0" + item_to_hash;
+                                        var as_bytes = testnet_generator.hexToBytes( item_to_hash );
+                                    }
+                                    var hashed = testnet_generator.rmd160( as_bytes );
+                                    params.push( hashed );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_HASH160" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_hash = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof item_to_hash === "string" ) var as_bytes = testnet_generator.hexToBytes( item_to_hash );
+                                    else {
+                                        item_to_hash = item_to_hash.toString( 16 );
+                                        if ( item_to_hash % 2 ) item_to_hash = "0" + item_to_hash;
+                                        var as_bytes = testnet_generator.hexToBytes( item_to_hash );
+                                    }
+                                    var hashed = await testnet_generator.sha256( as_bytes );
+                                    var as_bytes = testnet_generator.hexToBytes( hashed );
+                                    hashed = testnet_generator.rmd160( as_bytes );
+                                    params.push( hashed );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_SWAP" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    params.push( item_1 );
+                                    params.push( item_2 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_DROP" ) {
+                                    // console.log( "before acting:" );
+                                    // console.log( params );
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    // console.log( "results:" );
+                                    // console.log( params );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_2DROP" ) {
+                                    console.log( "before acting:" );
+                                    console.log( params );
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    console.log( "results:" );
+                                    console.log( params );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_1NEGATE" ) {
+                                    params.push( -1 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_NOP" ) {
+                                    input_with_op_nop = index;
+                                    return;
+                                }
+                                else if ( element === "OP_IF" ) {
+                                    // console.log( "params:" );
+                                    // console.log( params );
+                                    //add a boolean to the ifs_stack that is false if the previous element
+                                    //was something other than OP_1 or OP_TRUE, or if any element in
+                                    //the ifs_stack is false (because that means we are in an if_branch
+                                    //that should not be executed) -- otherwise true
+                                    if ( ifs_stack.includes( false ) ) {
+                                        ifs_stack.push( false );
+                                    } else {
+                                        if ( !params.length ) {
+                                            input_whose_stack_is_too_small = index;
+                                            return;
+                                        }
+                                        var item_to_check = params[ params.length - 1 ];
+                                        // console.log( "item_to_check:", item_to_check );
+                                        if ( item_to_check !== 1 && item_to_check !== 0 ) {
+                                            input_with_if_branch_preceded_by_something_other_than_1_or_0 = index;
+                                            return;
+                                        }
+                                        params.reverse();
+                                        params.splice( 0, 1 );
+                                        params.reverse();
+                                        if ( item_to_check !== 1 ) ifs_stack.push( false );
+                                        else ifs_stack.push( true );
+                                    }
+                                    // console.log( "ifs_stack:" );
+                                    // console.log( ifs_stack );
+                                }
+                                else if ( element === "OP_NOTIF" ) {
+                                    // console.log( "params:" );
+                                    // console.log( params );
+                                    if ( ifs_stack.includes( false ) ) {
+                                        ifs_stack.push( false );
+                                    } else {
+                                        if ( !params.length ) {
+                                            input_whose_stack_is_too_small = index;
+                                            return;
+                                        }
+                                        var item_to_check = params[ params.length - 1 ];
+                                        // console.log( "item_to_check:", item_to_check );
+                                        if ( item_to_check !== 1 && item_to_check !== 0 ) {
+                                            input_with_if_branch_preceded_by_something_other_than_1_or_0 = index;
+                                            return;
+                                        }
+                                        params.reverse();
+                                        params.splice( 0, 1 );
+                                        params.reverse();
+                                        if ( item_to_check !== 0 ) ifs_stack.push( false );
+                                        else ifs_stack.push( true );
+                                    }
+                                    // console.log( "ifs_stack:" );
+                                    // console.log( ifs_stack );
+                                }
+                                else if ( element === "OP_ELSE" ) {
+                                    //flip the last element in the ifs_stack
+                                    ifs_stack[ ifs_stack.length - 1 ] = !ifs_stack[ ifs_stack.length - 1 ];
+                                    // console.log( "ifs_stack:" );
+                                    // console.log( ifs_stack );
+                                }
+                                else if ( element === "OP_ENDIF" ) {
+                                    // console.log( "params:" );
+                                    // console.log( params );
+                                    //drop the last element in the ifs_stack
+                                    ifs_stack.pop();
+                                    // console.log( "ifs_stack:" );
+                                    // console.log( ifs_stack );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_VERIFY" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_check = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( item_to_check !== 1 ) {
+                                        input_whose_script_failed_a_verify_opcode = index;
+                                        return;
+                                    }
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_RETURN" ) {
+                                    input_with_script_containing_op_return = index;
+                                    return;
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_0NOTEQUAL" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_check = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( item_to_check === 0 ) params.push( 0 );
+                                    else params.push( 1 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_TOALTSTACK" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_push = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    alt_stack.unshift( item_to_push );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_FROMALTSTACK" ) {
+                                    if ( !alt_stack.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_pull = alt_stack[ 0 ];
+                                    params.push( item_to_pull );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_IFDUP" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_dup = params[ params.length - 1 ];
+                                    var copy = JSON.parse( JSON.stringify( item_to_dup ) );
+                                    if ( item_to_dup !== 0 ) params.push( copy );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_DEPTH" ) {
+                                    params.push( params.length );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_NIP" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    params.push( item_2 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_OVER" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_2 = params[ params.length - 1 ];
+                                    var copy = JSON.parse( JSON.stringify( item_to_dup ) );
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    params.push( item_2 );
+                                    params.push( item_1 );
+                                    params.push( copy );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_PICK" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var num_to_pick = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof num_to_pick !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( num_to_pick > 2147483647 ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( num_to_pick < -2147483647 ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( params.length < num_to_pick ) {
+                                        input_whose_script_tried_to_get_a_nonexistent_element_from_the_stack = index;
+                                        return;
+                                    }
+                                    var item_to_dup = params[ params.length - ( num_to_pick + 1 ) ];
+                                    var copy = JSON.parse( JSON.stringify( item_to_dup ) );
+                                    params.push( copy );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_ROLL" ) {
+                                    // console.log( "before acting:" );
+                                    // console.log( params );
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var num_to_pick = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof num_to_pick !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( num_to_pick > 2147483647 ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( num_to_pick < -2147483647 ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( params.length < num_to_pick ) {
+                                        input_whose_script_tried_to_get_a_nonexistent_element_from_the_stack = index;
+                                        return;
+                                    }
+                                    var item_to_move = params[ params.length - ( num_to_pick + 1 ) ];
+                                    var copy = JSON.parse( JSON.stringify( item_to_move ) );
+                                    // console.log( "results:" );
+                                    // console.log( params );
+                                    params.splice( params.length - ( num_to_pick + 1 ), 1 );
+                                    params.push( copy );
+                                    // console.log( params );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_ROT" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_3 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    params.push( item_2 );
+                                    params.push( item_3 );
+                                    params.push( item_1 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_TUCK" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_2 = params[ params.length - 1 ];
+                                    var copy = JSON.parse( JSON.stringify( item_2 ) );
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    params.push( copy );
+                                    params.push( item_1 );
+                                    params.push( item_2 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_DUP" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_dup = params[ params.length - 1 ];
+                                    var copy = JSON.parse( JSON.stringify( item_to_dup ) );
+                                    params.push( copy );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_2DUP" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_dup_1 = params[ params.length - 1 ];
+                                    var copy_1 = JSON.parse( JSON.stringify( item_to_dup_1 ) );
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_dup_2 = params[ params.length - 1 ];
+                                    var copy_2 = JSON.parse( JSON.stringify( item_to_dup_2 ) );
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    params.push( copy_2 );
+                                    params.push( copy_1 );
+                                    params.push( copy_2 );
+                                    params.push( copy_1 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_3DUP" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_dup_1 = params[ params.length - 1 ];
+                                    var copy_1 = JSON.parse( JSON.stringify( item_to_dup_1 ) );
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_dup_2 = params[ params.length - 1 ];
+                                    var copy_2 = JSON.parse( JSON.stringify( item_to_dup_2 ) );
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_to_dup_3 = params[ params.length - 1 ];
+                                    var copy_3 = JSON.parse( JSON.stringify( item_to_dup_3 ) );
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    params.push( copy_3 );
+                                    params.push( copy_2 );
+                                    params.push( copy_1 );
+                                    params.push( copy_3 );
+                                    params.push( copy_2 );
+                                    params.push( copy_1 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_2OVER" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_4 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_3 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_2 = params[ params.length - 1 ];
+                                    var copy_2 = JSON.parse( JSON.stringify( item_2 ) );
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_1 = params[ params.length - 1 ];
+                                    var copy_1 = JSON.parse( JSON.stringify( item_1 ) );
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    params.push( item_1 );
+                                    params.push( item_2 );
+                                    params.push( item_3 );
+                                    params.push( item_4 );
+                                    params.push( copy_1 );
+                                    params.push( copy_2 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_2ROT" ) {
+                                    console.log( "before acting:" );
+                                    console.log( params );
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_6 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_5 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_4 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_3 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    params.push( item_3 );
+                                    params.push( item_4 );
+                                    params.push( item_5 );
+                                    params.push( item_6 );
+                                    params.push( item_1 );
+                                    params.push( item_2 );
+                                    console.log( "results:" );
+                                    console.log( params );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_2SWAP" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_4 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_3 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    params.push( item_3 );
+                                    params.push( item_4 );
+                                    params.push( item_1 );
+                                    params.push( item_2 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_SIZE" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var item = params[ params.length - 1 ];
+                                    if ( typeof item === "number" ) {
+                                        if ( item >= -2147483647 && item < 2147483648 ) var size = 4;
+                                        if ( item >= -8388607 && item < 8388608 ) var size = 3;
+                                        if ( item >= -32767 && item < 32768 ) var size = 2;
+                                        if ( item >= -127 && item < 128 ) var size = 1;
+                                        if ( item === 0 ) var size = 0;
+                                    } else {
+                                        var size = item.length / 2;
+                                    }
+                                    params.push( size );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_1ADD" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input = params[ params.length - 1 ];
+                                    if ( typeof input !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    params.push( input + 1 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_1SUB" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input = params[ params.length - 1 ];
+                                    if ( typeof input !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    params.push( input - 1 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_NEGATE" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input = params[ params.length - 1 ];
+                                    if ( typeof input !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    params.push( -input );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_ABS" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input = params[ params.length - 1 ];
+                                    if ( typeof input !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( input < 0 || ( input === 0 && testnet_generator.isZeroNegative( input ) ) ) params.push( -input );
+                                    else params.push( input );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_NOT" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input = params[ params.length - 1 ];
+                                    if ( typeof input !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( input === 0 ) var output = 1;
+                                    else var output = 0;
+                                    params.push( output );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_ADD" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_1 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_2 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    params.push( input_1 + input_2 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_SUB" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_1 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_2 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    params.push( input_1 - input_2 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_BOOLAND" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_1 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_2 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( input_1 !== 1 ) input_1 = 0;
+                                    if ( input_2 !== 1 ) input_2 = 0;
+                                    params.push( input_1 && input_2 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_BOOLOR" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_1 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_2 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( input_1 !== 1 ) input_1 = 0;
+                                    if ( input_2 !== 1 ) input_2 = 0;
+                                    params.push( input_1 | input_2 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_NUMEQUAL" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_1 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_2 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    params.push( input_1 === input_2 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_NUMEQUALVERIFY" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_1 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_2 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( input_1 !== input_2 ) {
+                                        input_whose_script_failed_a_verify_opcode = index;
+                                        return;                                        
+                                    }
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_NUMNOTEQUAL" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_1 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_2 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    params.push( input_1 !== input_2 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_MIN" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_1 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_2 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    params.push( Math.min( input_1, input_2 ) );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_MAX" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_1 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_1 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input_2 = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input_2 !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    params.push( Math.max( input_1, input_2 ) );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_WITHIN" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof input !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var min = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof min !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var max = params[ params.length - 1 ];
+                                    params.reverse();
+                                    params.splice( 0, 1 );
+                                    params.reverse();
+                                    if ( typeof max !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( input >= min && input < max ) params.push( 1 );
+                                    else params.push( 0 );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_CHECKLOCKTIMEVERIFY" ) {
+                                    // console.log( "before acting:" );
+                                    // console.log( params );
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input = params[ params.length - 1 ];
+                                    if ( typeof input !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( input > locktime ) {
+                                        input_whose_script_failed_CLTV_due_to_not_enough_time_passed = index;
+                                        return;
+                                    }
+                                    if ( input < 0 || ( input === 0 && testnet_generator.isZeroNegative( input ) ) ) {
+                                        input_whose_script_uses_a_negative_number_for_CLTV = index;
+                                        return;
+                                    }
+                                    if ( input >= 500000000 && locktime < 500000000 || locktime >= 500000000 && input < 500000000 ) {
+                                        input_whose_locktime_value_does_not_match_the_CLTV_value = index;
+                                        return;
+                                    }
+                                    if ( sequence === -2147483647 ) {
+                                        input_whose_script_uses_CLTV_but_the_sequence_number_is_maxxed_out = index;
+                                        return;
+                                    }
+                                    // console.log( "results:" );
+                                    // console.log( params );
+                                }
+                                else if ( !ifs_stack.includes( false ) && element === "OP_CHECKSEQUENCEVERIFY" ) {
+                                    if ( !params.length ) {
+                                        input_whose_stack_is_too_small = index;
+                                        return;
+                                    }
+                                    var input = params[ params.length - 1 ];
+                                    if ( typeof input !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
+                                    if ( input < sequence ) {
+                                        input_whose_script_failed_CSV = index;
+                                        return;
+                                    }
+                                    if ( input < 0 || ( input === 0 && testnet_generator.isZeroNegative( input ) ) ) {
+                                        input_whose_script_uses_a_negative_number_for_CLTV = index;
+                                        return;
+                                    }
+                                    if ( input >= 500000000 && locktime < 500000000 || locktime >= 500000000 && input < 500000000 ) {
+                                        input_whose_locktime_value_does_not_match_the_CLTV_value = index;
+                                        return;
+                                    }
+                                    if ( sequence === "ffffffff" ) {
+                                        input_whose_script_uses_CLTV_but_the_sequence_number_is_maxxed_out = index;
+                                        return;
+                                    }
+                                }
+                                else console.log( "the previous opcode or element was unsupported or we are in an if_branch that isn't supposed to execute" );
+                                script_as_asm.splice( 0, 1 );
+                                if ( script_as_asm.length ) await exeloop();
+                            }
+                            await exeloop();
+                            console.log( 'done' );
+                            if ( params.length != 1 ) {
+                                input_whose_script_left_multiple_elements_on_the_stack = index;
+                                console.log( params );
+                                break;
+                            }
+                            if ( params[ 0 ] !== 1 ) {
+                                input_whose_script_ended_on_false = index;
+                                console.log( params );
+                                break;
+                            }
+                        }
+                    }
+                }
+                //TODO: ensure there are never more than 1000 stack elements
+                //including the elements on the alt_stack
+                //TODO: ensure stack elements are 520 bytes or fewer
+                //TODO: ensure outputs are valid
+                //TODO: ensure outputs sum to less than or equal to inputs
+                //TODO: ensure timelocks are followed
+                //TODO: if the tx is non-standard, warn the user but give an option to anull standardness rules
+                if ( input_whose_script_failed_CLTV_due_to_not_enough_time_passed >= 0 ) return `that tx was invalid because input ${input_whose_script_failed_CLTV_due_to_not_enough_time_passed} has a script containing OP_CHECKLOCKTIMEVERIFY and not enough time passed or the locktime field was set lower than is required`;
+                if ( input_whose_script_uses_a_negative_number_for_CLTV >= 0 ) return `that tx was invalid because input ${input_whose_script_uses_a_negative_number_for_CLTV} has a script containing OP_CHECKLOCKTIMEVERIFY and tried to pass a negative number to it`;
+                if ( input_whose_locktime_value_does_not_match_the_CLTV_value >= 0 ) return `that tx was invalid because input ${input_whose_locktime_value_does_not_match_the_CLTV_value} has a locktime value does not match the value passed to OP_CHECKLOCKTIMEVERIFY in the script -- i.e. one of them a blockheight and the other is a unix timestamp`;
+                if ( input_whose_script_uses_CLTV_but_the_sequence_number_is_maxxed_out >= 0 ) return `that tx was invalid because input ${input_whose_script_uses_CLTV_but_the_sequence_number_is_maxxed_out} uses OP_CHECKLOCKTIMEVERIFY in the script but its sequence number is set to 0xffffffff -- this is not allowed, try setting the sequence number to 0xfffffffd or less`;
+                if ( input_whose_script_failed_CSV >= 0 ) return `that tx was invalid because input ${input_whose_script_failed_CSV} uses OP_CHECKSEQUENCEVERIFY in the script but its value is lower than the sequence number of that input`;
+                if ( input_with_if_branch_preceded_by_something_other_than_1_or_0 >= 0 ) return `that tx was invalid because input ${input_with_if_branch_preceded_by_something_other_than_1_or_0} had an if_branch that was preceded by something other than a 1 or a 0`;
+                if ( input_with_insufficient_witness_length >= 0 ) return `that tx was invalid because input ${input_with_insufficient_witness_length} needed at least one element on the witness stack and it wasn't there`;
+                if ( input_with_invalid_sig >= 0 ) return `that tx was invalid because input ${input_with_invalid_sig} had an invalid sig`;
+                if ( input_whose_stack_is_too_small >= 0 ) return `that tx was invalid because input ${input_whose_stack_is_too_small} ran into an opcode that required more elements on the stack than were available there`;
+                if ( input_with_improperly_formatted_sig >= 0 ) return `that tx was invalid because input ${input_with_improperly_formatted_sig} ran into an opcode that required a signature, and the signature passed to it was improperly formatted`;
+                if ( input_with_improperly_formatted_element >= 0 ) return `that tx was invalid because input ${input_with_improperly_formatted_element} had a non-opcode element on the witness stack that was formatted as something other than a hex string`;
+                if ( input_whose_script_failed_a_verify_opcode >= 0 ) return `that tx was invalid because the script for input ${input_whose_script_failed_a_verify_opcode} had an opcode with "verify" in it (one of these: OP_CHECKSIGVERIFY, OP_CHECKMULTISIGVERIFY, OP_EQUALVERIFY, OP_NUMEQUALVERIFY, or OP_VERIFY) and "verify" failed`;
+                if ( input_with_op_nop >= 0 ) return `that tx was invalid because the script for input ${input_with_op_nop} had an op_nop opcode, which is non-standard`;
+                if ( input_whose_script_left_multiple_elements_on_the_stack >= 0 ) return `that tx was invalid because input ${input_whose_script_left_multiple_elements_on_the_stack} left multiple elements on the stack, and at the end of script execution there is only supposed to be 1 element left on the stack`;
+                if ( input_whose_script_ended_on_false >= 0 ) return `that tx was invalid because input ${input_whose_script_ended_on_false} ended with a value other than 1 on the stack`;
+                if ( input_with_script_containing_op_return >= 0 ) return `that tx was invalid because input ${input_with_script_containing_op_return} ran into an op_return while executing the script`;
+                if ( input_whose_script_treats_a_string_as_an_integer >= 0 ) return `that tx was invalid because input ${input_whose_script_treats_a_string_as_an_integer} has a script that tried to treat a string as an integer`;
+                if ( input_whose_script_tried_to_get_a_nonexistent_element_from_the_stack >= 0 ) return `that tx was invalid because input ${input_whose_script_tried_to_get_a_nonexistent_element_from_the_stack} has a script that tried to get a nonexistent element from the stack`;
+            }
+            var broadcast = async txhex => {
+                if ( !txhex || typeof txhex === "object" ) txhex = $( '.tx_broadcaster' ).value;
+                var reason_why_tx_is_invalid = await validateTx( txhex );
+                if ( reason_why_tx_is_invalid ) return alert( reason_why_tx_is_invalid );
+                testnet_generator.mempool.push( txhex );
+                var txid = tapscript.Tx.util.getTxid( txhex );
+                $( '.broadcast_success_label' ).classList.remove( "hidden" );
+                $( '.broadcast_success_txid' ).innerText = txid;
+                $( '.broadcast_success_txid' ).setAttribute( "data-txhex", txhex );
+                $( '.broadcast_success_txid' ).setAttribute( "data-idx", 1 );
+                $( '.broadcast_success_txid' ).onclick = () => {
+                    showPage( 'tx_explorer' );
+                    testnet_generator.showSoloTx( txid, txhex, 1 );
+                };
+                var tx = tapscript.Tx.decode( txhex );
+                var txid = tapscript.Tx.util.getTxid( tx );
+                var i; for ( i=0; i<tx.vin.length; i++ ) {
+                    var input = tx.vin[ i ];
+                    var index = i;
+                    var input_exists = false;
+                    var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
+                    testnet_generator.utxo_set[ input_id ].spent = true;
+                    var addy = testnet_generator.utxo_set[ input_id ].addy;
+                    testnet_generator.addresses[ addy ][ "sent" ].push( `${txid}_${i}` );
+                }
+                tx.vout.forEach( ( output, vout ) => {
+                    testnet_generator.utxo_set[ `${txid}_${vout}` ] = {
+                        txid,
+                        vout,
+                        amnt: Number( output[ "value" ] ),
+                        addy: tapscript.Address.fromScriptPubKey( output[ "scriptPubKey" ], "testnet" ),
+                        spent: false,
+                        txhex,
+                        idx: undefined,
+                        block_created: undefined,
+                        block_spent: undefined,
+                    }
+                });
+                var i; for ( i=0; i<tx.vout.length; i++ ) {
+                    var output = tx.vout[ i ];
+                    var addy = tapscript.Address.fromScriptPubKey( output[ "scriptPubKey" ], "testnet" );
+                    var output_id = `${txid}_${i}`;
+                    if ( !( addy in testnet_generator.addresses ) ) testnet_generator.addresses[ addy ] = {
+                        sent: [],
+                        received: [],
+                    }
+                    testnet_generator.addresses[ addy ][ "received" ].push( output_id );
+                }
+                calcBalance();
+                calcMempool();
+            }
+            $( '.broadcast_btn' ).onclick = broadcast;
+            var calcMempool = () => $( '.txs_in_mempool' ).innerText = testnet_generator.mempool.length;
+            var runScript = () => {
+                var keypairs = [testnet_generator.getAddy(), testnet_generator.getAddy(), testnet_generator.getAddy()];
+                var script = [
+                    "OP_3",
+                    "OP_CHECKLOCKTIMEVERIFY",
+                    "OP_DROP",
+                ];
+                keypairs.forEach( ( keypair, idx ) => {
+                    if ( !idx ) script.push( testnet_generator.getPubkey( keypair[ 1 ] ), "OP_CHECKSIG" );
+                    else script.push( testnet_generator.getPubkey( keypair[ 1 ] ), "OP_CHECKSIGADD" );
+                });
+                script.push( "OP_1", "OP_GREATERTHANOREQUAL" );
+                console.log( "script:" );
+                console.log( script );
+                var tree = [tapscript.Tap.encodeScript( script )];
+                var tapleaf = tree[ 0 ];
+                var backup_pubkey = "ab".repeat( 32 );
+                var [ tpubkey, cblock ] = tapscript.Tap.getPubKey( backup_pubkey, { target: tapleaf });
+                var addy = tapscript.Address.p2tr.fromPubKey( tpubkey, 'testnet' );
+                console.log( 'send money to this address:' );
+                console.log( addy );
+                var txhex = sendMoney();
+                if ( !testnet_generator.isValidHex( txhex ) ) return;
+                var txid = tapscript.Tx.util.getTxid( txhex );
+                var vout = 0;
+                var amnt = Number( prompt( `enter the amount you sent` ) );
+                // var txid = prompt( `enter the txid` );
+                // var vout = Number( prompt( `and the vout` ) );
+                // var amnt = Number( prompt( `and the amnt` ) );
+                var txdata = tapscript.Tx.create({
+                    vin: [testnet_generator.getVin( txid, vout, amnt, addy )],
+                    vout: [testnet_generator.getVout( amnt - 500, $( '.your_addy' ).innerText )],
+                });
+                txdata.locktime = 3;
+                txdata.vin.forEach( ( input, index ) => {
+                    // var sig_0 = tapscript.Signer.taproot.sign( keypairs[ 0 ][ 1 ], txdata, 0, { extension: tapleaf }).hex;
+                    // sig_0 = ( BigInt( '0x' + sig_0 ) - BigInt( '0x01' ) ).toString( 16 );
+                    // if ( sig_0.length % 2 ) sig_0 = "0" + sig_0;
+                    var sig_0 = "";
+                    var sig_1 = tapscript.Signer.taproot.sign( keypairs[ 1 ][ 1 ], txdata, 0, { extension: tapleaf }).hex;
+                    var sighash = tapscript.Signer.taproot.hash( txdata, 0, { extension: tapleaf }).hex;
+                    // var sig_2 = tapscript.Signer.taproot.sign( keypairs[ 2 ][ 1 ], txdata, 0, { extension: tapleaf }).hex;
+                    var sig_2 = "";
+                    // console.log( 44, "pubkey:", tapscript.Address.toScriptPubKey( keypairs[ 1 ][ 0 ] )[ 1 ], "sighash:", sighash, "sig:", sig_1 );
+                    txdata.vin[ index ].witness = [ sig_2, sig_1, sig_0, script, cblock ];
+                });
+                console.log( tapscript.Tx.encode( txdata ).hex );
+            }
+            $( '.auto_generate' ).onchange = () => {
+                autogen_value = $( '.auto_generate' ).value;
+                if ( autogen_value.includes( "---" ) ) $( '.auto_go' ).disabled = true;
+                else $( '.auto_go' ).removeAttribute( "disabled" );
+            }
+            var autogen_num = null;
+            var autogo = false;
+            $( '.auto_go' ).onclick = () => {
+                if ( $( '.auto_go' ).innerText === "Go" ) {
+                    if ( $( '.auto_go' ).disabled ) return;
+                    autogen_value = $( '.auto_generate' ).value;
+                    var num = 500;
+                    if ( autogen_value === "1 second" ) num = 1_000;
+                    if ( autogen_value === "3 seconds" ) num = 3_000;
+                    if ( autogen_value === "5 seconds" ) num = 5_000;
+                    if ( autogen_value === "10 seconds" ) num = 10_000;
+                    if ( autogen_value === "30 seconds" ) num = 30_000;
+                    if ( autogen_value === "1 minute" ) num = 60_000;
+                    if ( autogen_value === "2 minutes" ) num = 120_000;
+                    if ( autogen_value === "5 minutes" ) num = 300_000;
+                    if ( autogen_value === "10 minutes" ) num = 600_000;
+                    autogen_num = num;
+                    autogo = true;
+                    autoLoop();
+                    $( '.auto_go' ).innerText = "Stop";
+                } else {
+                    autogo = false;
+                    $( '.auto_go' ).innerText = "Go";
+                }
+            }
+            var autoLoop = async () => {
+                makeBlock();
+                var keep_going = autogo;
+                await testnet_generator.waitSomeTime( autogen_num );
+                if ( !autogo ) keep_going = false;
+                if ( keep_going ) autoLoop();
+            }
+            var showPage = page => {
+                $( '.block_explorer' ).classList.add( "hidden" );
+                $( '.tx_explorer' ).classList.add( "hidden" );
+                $( '.addy_explorer' ).classList.add( "hidden" );
+                $( '.stuff_thats_not_an_explorer' ).classList.add( "hidden" );
+                $( `.${page}` ).classList.remove( "hidden" );
+            }
+            (async()=>{
+                $( '.auto_generate' ).value = "--- Auto generate ---";
+                $( '.auto_go' ).disabled = true;
+                $( '.tx_broadcaster' ).value = "";
+                window.scrollTo( 0, 0 );
+            })();
+        </script>
+    </body>
+</html>
