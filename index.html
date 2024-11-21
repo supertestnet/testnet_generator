@@ -272,6 +272,12 @@
                     return maxnum_halved - parseInt( rev, 16 );
                   }
                 },
+                hexToBinary: hex => {
+                    var array_hex = hex.match( /\w{2}/g );
+                    var array_bin = [];
+                    array_hex.forEach( item => array_bin.push( ( parseInt( item, 16 ).toString( 2 ) ).padStart( 8, '0' ) ) );
+                    return array_bin.join( "" );
+                },
                 isValidHex: hex => {
                     if ( !hex ) return;
                     var length = hex.length;
@@ -777,6 +783,7 @@
                 var input_whose_locktime_value_does_not_match_the_CLTV_value = -1;
                 var input_whose_script_uses_CLTV_but_the_sequence_number_is_maxxed_out = -1;
                 var input_whose_script_failed_CSV = -1;
+                var input_whose_script_failed_relative_timelock = -1;
                 var i; for ( i=0; i<tx.vin.length; i++ ) {
                     var input = tx.vin[ i ];
                     var index = i;
@@ -809,8 +816,53 @@
                     var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
                     var addy = testnet_generator.utxo_set[ input_id ].addy;
                     var type = tapscript.Address.decode( addy ).type;
-                    //note: sequence is encoded as little endian
+                    var sequence_binary = testnet_generator.hexToBinary( input.sequence );
+                    var first_bit = Number( sequence_binary[ 0 ] );
+                    var tenth_bit = Number( sequence_binary[ 9 ] );
                     var sequence = testnet_generator.littleEndianSignedHexToDecimal( input.sequence );
+                    var sequence_value = null;
+                    if ( !first_bit ) {
+                        //the "disable flag" is not set so we are about to enforce the sequence number as a relative locktime
+                        var mined_in_block = testnet_generator.utxo_set[ input_id ].block_created;
+                        var current_blockheight = Object.keys( testnet_generator.blocks ).length - 1;
+                        sequence_value = input.sequence.substring( 4 );
+                        if ( sequence_value.substring( 0, 2 ) != "00" ) {
+                            sequence_value = parseInt( sequence_value, 16 );
+                        } else {
+                            sequence_value = parseInt( sequence_value.substring( 2 ), 16 );
+                        }
+                        if ( !tenth_bit ) {
+                            //the "type" bit is not set so this is a block-based relative timelock rather
+                            //than a timestamp-based relative timelock
+                            if ( !mined_in_block && parseInt( sequence_binary, 2 ) > 0 ) {
+                                input_whose_script_failed_relative_timelock = index;
+                                break;
+                            } else if ( mined_in_block ) {
+                                var num_of_blocks_since_parent = current_blockheight - mined_in_block;
+                                if ( num_of_blocks_since_parent < sequence_value ) {
+                                    input_whose_script_failed_relative_timelock = index;
+                                    break;
+                                }
+                            }
+                        } else {
+                            //the "type" bit is set so this is a timestmap-based relative timelock rather
+                            //than a block-based relative timelock
+                            if ( !mined_in_block && parseInt( sequence_binary, 2 ) > 0 ) {
+                                input_whose_script_failed_relative_timelock = index;
+                                break;
+                            } else if ( mined_in_block ) {
+                                var id_of_parent_block = testnet_generator.intToHex( mined_in_block ).padStart( 64, "0" );
+                                var mined_at_timestamp = testnet_generator.blocks[ id_of_parent_block ].timestamp;
+                                var time_to_wait = sequence_value * 512;
+                                var now = Math.floor( Date.now() / 1000 );
+                                var time_since_parent = now - mined_at_timestamp;
+                                if ( time_since_parent < time_to_wait ) {
+                                    input_whose_script_failed_relative_timelock = index;
+                                    break;
+                                }
+                            }
+                        }
+                    }
                     if ( type === "p2tr" ) {
                         //ensure at least one element exists on the witness stack
                         if ( !input.witness.length ) {
@@ -2278,7 +2330,6 @@
                 //TODO: ensure stack elements are 520 bytes or fewer
                 //TODO: ensure outputs are valid
                 //TODO: ensure outputs sum to less than or equal to inputs
-                //TODO: ensure timelocks are followed
                 //TODO: if the tx is non-standard, warn the user but give an option to anull standardness rules
                 if ( input_whose_script_failed_CLTV_due_to_not_enough_time_passed >= 0 ) return `that tx was invalid because input ${input_whose_script_failed_CLTV_due_to_not_enough_time_passed} has a script containing OP_CHECKLOCKTIMEVERIFY and not enough time passed or the locktime field was set lower than is required`;
                 if ( input_whose_script_uses_a_negative_number_for_CLTV >= 0 ) return `that tx was invalid because input ${input_whose_script_uses_a_negative_number_for_CLTV} has a script containing OP_CHECKLOCKTIMEVERIFY and tried to pass a negative number to it`;
@@ -2298,6 +2349,7 @@
                 if ( input_with_script_containing_op_return >= 0 ) return `that tx was invalid because input ${input_with_script_containing_op_return} ran into an op_return while executing the script`;
                 if ( input_whose_script_treats_a_string_as_an_integer >= 0 ) return `that tx was invalid because input ${input_whose_script_treats_a_string_as_an_integer} has a script that tried to treat a string as an integer`;
                 if ( input_whose_script_tried_to_get_a_nonexistent_element_from_the_stack >= 0 ) return `that tx was invalid because input ${input_whose_script_tried_to_get_a_nonexistent_element_from_the_stack} has a script that tried to get a nonexistent element from the stack`;
+                if ( input_whose_script_failed_relative_timelock >= 0 ) return `that tx was invalid because input ${input_whose_script_failed_relative_timelock} has a non-zero relative timelock in its sequence number, which means the tx must wait a certain amount of time after that input utxo gets mined, and not enough time has passed`;
             }
             var broadcast = async txhex => {
                 if ( !txhex || typeof txhex === "object" ) txhex = $( '.tx_broadcaster' ).value;
