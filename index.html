@@ -1481,6 +1481,10 @@
                                     params.reverse();
                                     params.splice( 0, 1 );
                                     params.reverse();
+                                    if ( typeof item_to_check !== "number" ) {
+                                        input_whose_script_treats_a_string_as_an_integer = index;
+                                        return;
+                                    }
                                     if ( item_to_check === 0 ) params.push( 0 );
                                     else params.push( 1 );
                                 }
