@@ -882,6 +882,8 @@
                             var script = input.witness[ input.witness.length - 2 ];
                             var params = [];
                             input.witness.forEach( ( element, element_index ) => {
+                                if ( element === "OP_0" || element === "OP_FALSE" || element === "" ) element = 0;
+                                if ( element === "OP_1" || element === "OP_TRUE" ) element = 1;
                                 if ( element_index < input.witness.length - 2 ) params.push( element );
                             });
                             var script_as_asm = tapscript.Script.fmt.toAsm( script );
