@@ -397,6 +397,7 @@
                         var amnt = testnet_generator.utxo_set[ output_id ].amnt;
                         outputs_html = outputs_html + `
                             <div class="output">
+                                <p>Vout: <span class="which_vout_is_this">${index}</span></p>
                                 <p>"To" address: <span class="to_address addy_link">${addy}</span></p>
                                 <p>Amount received by this address in this tx: <span class="amnt_received">${testnet_generator.satsToBitcoin( amnt )} btc</span></p>
                             </div>
