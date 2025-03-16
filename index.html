@@ -1,9 +1,11 @@
+
 <!DOCTYPE html>
 <html>
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, user-scalable=no">
         <script src="https://unpkg.com/@dashincubator/ripemd160/ripemd160.js"></script>
+        <script src="https://supertestnet.github.io/bankify/super_nostr.js"></script>
         <script src="https://unpkg.com/@cmdcode/tapscript@1.4.0"></script>
         <script src="https://bundle.run/noble-secp256k1@1.2.14"></script>
         <style>
@@ -148,6 +150,24 @@
                 text-decoration: underline;
                 cursor: pointer;
             }
+            .pink {
+                background-color: pink;
+            }
+            .lightblue {
+                background-color: lightblue;
+            }
+            .yellow {
+                background-color: yellow;
+            }
+            .green {
+                background-color: lightgreen;
+            }
+            .white {
+                background-color: white;
+            }
+            .grey {
+                background-color: #cccccc;
+            }
             @media screen and (max-width: 600px) {
             }
         </style>
@@ -158,6 +178,13 @@
             var url_keys = url_params.keys();
             var $_GET = {}
             for ( var key of url_keys ) $_GET[ key ] = url_params.get( key );
+            var hash_arr = window.location.href.substring( window.location.href.indexOf( "#" ) ).split( "#" );
+            hash_arr.splice( 0, 1 );
+            var params = {}
+            hash_arr.forEach( item => {
+                var vals = item.split( "=" );
+                params[ vals[ 0 ] ] = vals[ 1 ];
+            });
         </script>
     </head>
     <body>
@@ -199,7 +226,7 @@
                     <div class="addy_tx_info"></div>
                 </div>
                 <div class="stuff_thats_not_an_explorer">
-                    <div><button class="generate_block">Generate block</button></div>
+                    <div><button class="generate_block" disabled>Generate block</button></div>
                     <div class="auto_gen">
                         <span class="auto_generate_label">Auto generator: </span>
                         <select class="auto_generate">
@@ -239,14 +266,16 @@
                 mempool: [],
                 utxos: {},
                 addresses: {},
+                relays: [ "wss://nostrue.com" ],
+                addykind: "testnet",
                 hexToBytes: hex => Uint8Array.from( hex.match( /.{1,2}/g ).map( byte => parseInt( byte, 16 ) ) ),
                 bytesToHex: bytes => bytes.reduce( ( str, byte ) => str + byte.toString( 16 ).padStart( 2, "0" ), "" ),
                 getPrivkey: () => testnet_generator.bytesToHex( nobleSecp256k1.utils.randomPrivateKey() ),
                 getPubkey: privkey => nobleSecp256k1.getPublicKey( privkey, true ).substring( 2 ),
-                getAddy: () => {
-                    var privkey = testnet_generator.getPrivkey();
+                getAddy: privkey => {
+                    if ( !privkey ) privkey = testnet_generator.getPrivkey();
                     var pubkey = testnet_generator.getPubkey( privkey );
-                    var addy = tapscript.Address.p2tr.fromPubKey( pubkey, "testnet" );
+                    var addy = tapscript.Address.p2tr.fromPubKey( pubkey, testnet_generator.addykind );
                     return [ addy, privkey ];
                 },
                 intToHex: int => {
@@ -292,6 +321,12 @@
                     var padding = prepad.slice( -Math.abs( length ) );
                     return ( padding === hex );
                 },
+                isValidAddress: address => {
+                    try {
+                        return !!tapscript.Address.decode( address ).script;
+                    } catch( e ) {return;}
+                    return;
+                },
                 isZeroNegative: zero => {
                     var isZero = zero === 0;
                     var isNegative = 1 / zero === -Infinity;
@@ -329,12 +364,12 @@
                     vout,
                     prevout: {
                         value: amnt,
-                        scriptPubKey: tapscript.Address.toScriptPubKey( addy ),
+                        scriptPubKey: testnet_generator.isValidAddress( addy ) ? tapscript.Address.toScriptPubKey( addy ) : addy,
                     },
                 }),
                 getVout: ( amnt, addy ) => ({
                     value: amnt,
-                    scriptPubKey: tapscript.Address.toScriptPubKey( addy ),
+                    scriptPubKey: testnet_generator.isValidAddress( addy ) ? tapscript.Address.toScriptPubKey( addy ) : addy,
                 }),
                 satsToBitcoin: sats => {
                     var btc = String( sats ).padStart( 8, "0" ).slice( 0,-8 ) + "." + String( sats ).padStart( 8, "0" ).slice( -8 );
@@ -350,12 +385,15 @@
                 },
                 showTx: ( txhex, idx ) => {
                     if ( idx === undefined ) idx = 1;
+                    var background_color = "pink";
+                    if ( idx % 2 ) background_color = "lightblue";
                     var txs_html = ``;
                     var tx = tapscript.Tx.decode( txhex );
                     var txid = tapscript.Tx.util.getTxid( tx );
                     var display_fee = !!idx ? "" : "hidden";
                     var tx_html = `
-                        <div class="tx">
+                        <div class="tx ${background_color}">
+                            <p>Tx: <span class="txnum">${idx}</span></p>
                             <div>Txid: <span class="txid txid_link" data-txhex="${txhex}" data-idx="${idx}">${txid}</span></div>
                             <div class="${display_fee}">Fee: <span class="fee">0</span> btc</div>
                             <div class="inputs"></div>
@@ -371,6 +409,9 @@
                         var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
                         if ( !idx ) var from_addy = "";
                         else var from_addy = testnet_generator.utxo_set[ input_id ].addy;
+                        try {
+                            from_addy = tapscript.Address.fromScriptPubKey( from_addy, testnet_generator.addykind );
+                        } catch( e ) {}
                         if ( !idx ) var amnt_sent = "";
                         else var amnt_sent = testnet_generator.utxo_set[ input_id ].amnt;
                         var input_txid = input[ "txid" ];
@@ -379,9 +420,11 @@
                         if ( `${input[ "txid" ]}_${input[ "vout" ]}` in testnet_generator.utxo_set ) input_idx = testnet_generator.utxo_set[ `${input[ "txid" ]}_${input[ "vout" ]}` ][ "idx" ];
                         if ( !idx ) var input_txhex = "";
                         else var input_txhex = testnet_generator.utxo_set[ `${input[ "txid" ]}_${input[ "vout" ]}` ][ "txhex" ];
-                        if ( !idx ) inputs_html = inputs_html + `<div class="input">Coinbase</div>`;
+                        var vin_bg_color = "yellow";
+                        if ( index % 2 ) vin_bg_color = "green";
+                        if ( !idx ) inputs_html = inputs_html + `<div class="input ${vin_bg_color}">Coinbase</div>`;
                         else inputs_html = inputs_html + `
-                            <div class="input">
+                            <div class="input ${vin_bg_color}">
                                 <p>"From" address: <span class="from_address addy_link">${from_addy}</span></p>
                                 <p>Amount sent from this address in this tx: <span class="amnt_sent">${testnet_generator.satsToBitcoin( amnt_sent )} btc</span></p>
                                 <p>Tx that originally created this input: <span class="input_txid txid_link" data-txhex="${input_txhex}" data-idx="${input_idx}">${input_txid}</span></p>
@@ -394,9 +437,14 @@
                         if ( !index ) outputs_html = `<p style="text-align: center;">Outputs</p>`;
                         var output_id = `${txid}_${index}`;
                         var addy = testnet_generator.utxo_set[ output_id ].addy;
+                        try {
+                            addy = tapscript.Address.fromScriptPubKey( addy, testnet_generator.addykind );
+                        } catch( e ) {}
                         var amnt = testnet_generator.utxo_set[ output_id ].amnt;
+                        var vout_bg_color = "white";
+                        if ( index % 2 ) vout_bg_color = "grey";
                         outputs_html = outputs_html + `
-                            <div class="output">
+                            <div class="output ${vout_bg_color}">
                                 <p>Vout: <span class="which_vout_is_this">${index}</span></p>
                                 <p>"To" address: <span class="to_address addy_link">${addy}</span></p>
                                 <p>Amount received by this address in this tx: <span class="amnt_received">${testnet_generator.satsToBitcoin( amnt )} btc</span></p>
@@ -468,15 +516,16 @@
                         }
                     });
                 },
-                showAddyInfo: ( addy ) => {
+                showAddyInfo: addy => {
                     $( '.explorer_addy' ).innerText = `${addy.substring( 0, 4 )}...${addy.substring( addy.length - 4 )}`;
                     $( '.full_address' ).innerText = addy;
-                    $( '.received_count' ).innerText = testnet_generator.addresses[ addy ].received.length;
-                    $( '.sent_count' ).innerText = testnet_generator.addresses[ addy ].sent.length;
+                    var spky = addy !== "51024e73" ? tapscript.Script.encode( tapscript.Address.toScriptPubKey( addy ) ).hex.substring( 2 ) : "51024e73";
+                    $( '.received_count' ).innerText = testnet_generator.addresses[ spky ].received.length;
+                    $( '.sent_count' ).innerText = testnet_generator.addresses[ spky ].sent.length;
                     var sent = [];
                     var total_sent = 0;
                     var total_sent_to_self = 0;
-                    testnet_generator.addresses[ addy ].sent.forEach( input_id => {
+                    testnet_generator.addresses[ spky ].sent.forEach( input_id => {
                         var txhex = testnet_generator.utxo_set[ input_id.substring( 0, 65 ) + "0" ].txhex;
                         sent.push( [ txhex, 1, undefined ] );
                         var tx = tapscript.Tx.decode( txhex );
@@ -485,8 +534,8 @@
                         var utxo_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
                         var recipients = [];
                         tx.vout.forEach( ( vout, index ) => {
-                            var recipient = tapscript.Address.fromScriptPubKey( vout[ "scriptPubKey" ], "testnet" );
-                            if ( recipient !== addy ) return;
+                            var recipient = vout[ "scriptPubKey" ];
+                            if ( recipient !== spky ) return;
                             total_sent_to_self = total_sent_to_self + Number( vout[ "value" ] );
                         });
                         var txinfo = testnet_generator.utxo_set[ utxo_id ];
@@ -495,7 +544,7 @@
                     $( '.total_sent' ).innerText = `${testnet_generator.satsToBitcoin( total_sent - total_sent_to_self )} btc`;
                     var received = [];
                     var total_received = 0;
-                    testnet_generator.addresses[ addy ].received.forEach( output_id => {
+                    testnet_generator.addresses[ spky ].received.forEach( output_id => {
                         var txinfo = testnet_generator.utxo_set[ output_id ];
                         received.push( [ txinfo.txhex, txinfo.idx, txinfo.block_created ] );
                         total_received = total_received + txinfo.amnt;
@@ -565,82 +614,145 @@
                         }
                     });
                 },
-            }
-            var makeBlock = () => {
-                var num = 0;
-                if ( $( '.block_num' ) ) num = Number( $$( '.block_num' )[ $$( '.block_num' ).length - 1 ].innerText ) + 1;
-                var generated_txid = testnet_generator.intToHex( num ).padStart( 64, "0" );
-                var vout = 0;
-                var amnt = 50 * 100_000_000;
-                var fees_from_mempool = 0;
-                testnet_generator.mempool.forEach( ( tx, idx ) => {
-                    var sum_of_inputs = 0;
-                    tx = tapscript.Tx.decode( tx );
-                    var txid = tapscript.Tx.util.getTxid( tx );
-                    tx.vin.forEach( input => {
-                        var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
-                        var amnt = testnet_generator.utxo_set[ input_id ].amnt;
-                        sum_of_inputs = sum_of_inputs + amnt;
-                        testnet_generator.utxo_set[ input_id ].spent = true;
-                        testnet_generator.utxo_set[ input_id ].block_spent = num;
-                    });
-                    var sum_of_outputs = 0;
-                    tx.vout.forEach( ( output, index ) => {
-                        sum_of_outputs = sum_of_outputs + Number( output[ "value" ] );
-                        testnet_generator.utxo_set[ `${txid}_${index}` ] = {
-                            txid,
-                            vout: index,
-                            amnt: Number( output[ "value" ] ),
-                            addy: tapscript.Address.fromScriptPubKey( output[ "scriptPubKey" ], "testnet" ),
-                            spent: false,
-                            txhex: tapscript.Tx.encode( tx ).hex,
-                            idx: idx + 1,
-                            block_created: num,
-                            block_spent: undefined,
+                processExistingBlocks: async () => {
+                    $( '.no_blocks_msg' ).innerText = "syncing...";
+                    var privkey = null;
+                    if ( params.hasOwnProperty( "privkey" ) ) privkey = params.privkey;
+                    var pubkey = privkey ? testnet_generator.getPubkey( privkey ) : params.pubkey;
+                    var relay = testnet_generator.relays[ 0 ];
+                    var num_of_blocks_expected = 1;
+                    var events = await super_nostr.getEvents( relay, null, [ pubkey ], [ 10426 ], null, null, 1 );
+                    console.log( events );
+                    if ( events.length ) num_of_blocks_expected = Number( events[ 0 ].content );
+                    $( '.no_blocks_msg' ).innerText = `synced 0 out of ${num_of_blocks_expected} blocks`;
+                    var syncLoop = async () => {
+                        var ids = null;
+                        var authors = [ pubkey ];
+                        var kinds = [ 60426 ];
+                        var until = null;
+                        var limit = 15;
+                        var all_events = [];
+                        var since = null;
+                        var innerLoop = async since => {
+                            var events = await super_nostr.getEvents( relay, ids, authors, kinds, since, until, limit );
+                            var events_already_known = 0;
+                            events.forEach( event => {
+                                var event_ids = [];
+                                all_events.forEach( evt => event_ids.push( evt.id ) );
+                                if ( event_ids.includes( event.id ) ) {
+                                    events_already_known = events_already_known + 1;
+                                    return;
+                                }
+                                all_events.push( event );
+                            });
+                            $( '.no_blocks_msg' ).innerText = `synced ${all_events.length} out of ${num_of_blocks_expected} blocks`;
+                            if ( !events.length || events_already_known === events.length ) return;
+                            if ( all_events.length === num_of_blocks_expected ) {
+                                $( '.no_blocks_msg' ).innerText = `synced ${num_of_blocks_expected} out of ${num_of_blocks_expected} blocks`;
+                                await testnet_generator.waitSomeTime( 200 );
+                                return;
+                            }
+                            var since = events[ 0 ].created_at - 1;
+                            await testnet_generator.waitSomeTime( 1 );
+                            await innerLoop( since );
                         }
+                        await innerLoop( since );
+                        return all_events;
+                    }
+                    var all_events = await syncLoop();
+                    if ( !all_events.length ) $( '.generate_block' ).disabled = false;
+                    all_events.sort( ( a, b ) => parseInt( a.tags[ 0 ][ 1 ], 16 ) - parseInt( b.tags[ 0 ][ 1 ], 16 ) );
+                    var i; for ( i=0; i<all_events.length; i++ ) {
+                        var block = all_events[ i ];
+                        var block_id = block.tags[ 0 ][ 1 ];
+                        var block_data = JSON.parse( block.content );
+                        makeBlock( block_id, block_data );
+                    }
+                    if ( $( '.generate_block' ) ) $( '.generate_block' ).disabled = false;
+                }
+            }
+            var makeBlock = async ( block_id, block_data ) => {
+                if ( !block_id ) {
+                    var num = 0;
+                    if ( $( '.block_num' ) ) num = Number( $$( '.block_num' )[ $$( '.block_num' ).length - 1 ].innerText ) + 1;
+                    var generated_txid = testnet_generator.intToHex( num ).padStart( 64, "0" );
+                    var vout = 0;
+                    var amnt = 50 * 100_000_000;
+                    var fees_from_mempool = 0;
+                    testnet_generator.mempool.forEach( ( tx, idx ) => {
+                        var sum_of_inputs = 0;
+                        tx = tapscript.Tx.decode( tx );
+                        var txid = tapscript.Tx.util.getTxid( tx );
+                        tx.vin.forEach( input => {
+                            var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
+                            var amnt = testnet_generator.utxo_set[ input_id ].amnt;
+                            sum_of_inputs = sum_of_inputs + amnt;
+                            testnet_generator.utxo_set[ input_id ].spent = true;
+                            testnet_generator.utxo_set[ input_id ].block_spent = num;
+                        });
+                        var sum_of_outputs = 0;
+                        tx.vout.forEach( ( output, index ) => {
+                            sum_of_outputs = sum_of_outputs + Number( output[ "value" ] );
+                            testnet_generator.utxo_set[ `${txid}_${index}` ] = {
+                                txid,
+                                vout: index,
+                                amnt: Number( output[ "value" ] ),
+                                addy: output[ "scriptPubKey" ],
+                                spent: false,
+                                txhex: tapscript.Tx.encode( tx ).hex,
+                                idx: idx + 1,
+                                block_created: num,
+                                block_spent: undefined,
+                            }
+                        });
+                        fees_from_mempool = fees_from_mempool + sum_of_inputs - sum_of_outputs;
                     });
-                    fees_from_mempool = fees_from_mempool + sum_of_inputs - sum_of_outputs;
-                });
-                amnt = amnt + fees_from_mempool;
+                    amnt = amnt + fees_from_mempool;
+                    var timestamp = Math.floor( Date.now() / 1000 );
+                } else {
+                    var generated_txid = block_id;
+                    var fees_from_mempool = block_data.fees;
+                    var amnt = 50 * 100_000_000 + fees_from_mempool;
+                    var vout = 0;
+                    var num = parseInt( generated_txid, 16 );
+                    var timestamp = block_data.timestamp;
+                }
                 var privkey = $( '.your_addy' ).getAttribute( "data-privkey" );
                 var to_pubkey = testnet_generator.getPubkey( privkey );
-                var to_addy = tapscript.Address.p2tr.fromPubKey( to_pubkey, "testnet" );
+                var to_addy = tapscript.Address.p2tr.fromPubKey( to_pubkey, testnet_generator.addykind );
                 var from_pubkey = "00".repeat( 32 );
-                var from_addy = tapscript.Address.p2tr.fromPubKey( from_pubkey, "testnet" );
-                var txdata = tapscript.Tx.create({
-                    vin: [testnet_generator.getVin( generated_txid, vout, amnt, from_addy )],
-                    vout: [testnet_generator.getVout( amnt, to_addy )],
-                });
-                var txid = tapscript.Tx.util.getTxid( txdata );
-                var txs = [ tapscript.Tx.encode( txdata ).hex ];
-                txs = [ ...txs, ...testnet_generator.mempool ];
-                testnet_generator.mempool = [];
+                var from_addy = tapscript.Address.p2tr.fromPubKey( from_pubkey, testnet_generator.addykind );
+                if ( !block_id ) {
+                    var txdata = tapscript.Tx.create({
+                        vin: [testnet_generator.getVin( generated_txid, vout, amnt, from_addy )],
+                        vout: [testnet_generator.getVout( amnt, to_addy )],
+                    });
+                    var txid = tapscript.Tx.util.getTxid( txdata );
+                    var txs = [ tapscript.Tx.encode( txdata ).hex ];
+                    txs = [ ...txs, ...testnet_generator.mempool ];
+                    testnet_generator.mempool = [];
+                } else {
+                    var txs = block_data.txs;
+                }
                 testnet_generator.blocks[ generated_txid ] = {
-                    timestamp: Math.floor( Date.now() / 1000 ),
+                    timestamp,
                     fees: fees_from_mempool,
                     txs,
                 }
-                testnet_generator.utxo_set[ `${txid}_${vout}` ] = {
-                    txid,
-                    vout,
-                    amnt,
-                    addy: to_addy,
-                    spent: false,
-                    txhex: tapscript.Tx.encode( txdata ).hex,
-                    idx: 0,
-                    block_created: num,
-                    block_spent: undefined,
-                }
-                var output_id = `${txid}_${vout}`;
-                if ( !( to_addy in testnet_generator.addresses ) ) testnet_generator.addresses[ to_addy ] = {
-                    sent: [],
-                    received: [],
-                }
-                testnet_generator.addresses[ to_addy ][ "received" ].push( output_id );
-                var utxo_id = testnet_generator.getPrivkey().substring( 0, 16 );
+                var spky = tapscript.Script.encode( tapscript.Address.toScriptPubKey( to_addy ) ).hex.substring( 2 );
+
+                txs.forEach( txhex => processTxhex( txhex ) );
                 calcBalance();
                 showBlock( num, testnet_generator.blocks[ generated_txid ].txs.length );
                 calcMempool();
+                if ( !block_id ) {
+                    var data_for_nostr = JSON.stringify( testnet_generator.blocks[ generated_txid ] );
+                    var privkey = $( '.your_addy' ).getAttribute( "data-privkey" );
+                    var event = await super_nostr.prepEvent( privkey, data_for_nostr, 60426, [ [ "e", generated_txid ] ] );
+                    super_nostr.sendEvent( event, testnet_generator.relays[ 0 ] );
+                    var event2 = await super_nostr.prepEvent( privkey, String( Object.keys( testnet_generator.blocks ).length ), 10426 );
+                    super_nostr.sendEvent( event2, testnet_generator.relays[ 0 ] );
+                }
             }
             var showBlock = ( num, count ) => {
                 var div = document.createElement( "div" );
@@ -674,7 +786,10 @@
                 Object.keys( testnet_generator.utxo_set ).forEach( utxo_id => {
                     if ( testnet_generator.utxo_set[ utxo_id ].spent ) return;
                     var utxo = testnet_generator.utxo_set[ utxo_id ];
-                    if ( utxo[ "addy" ] === $( '.your_addy' ).innerText ) {
+                    var real_spky = utxo[ "addy" ];
+                    var addy = tapscript.Address.toScriptPubKey( $( '.your_addy' ).innerText );
+                    var expected_spky = tapscript.Script.encode( addy ).hex.substring( 2 );
+                    if ( real_spky === expected_spky ) {
                         bal = bal + utxo[ "amnt" ];
                         my_utxos[ utxo_id ] = {
                             utxo_id,
@@ -689,9 +804,9 @@
                 testnet_generator.utxos = my_utxos;
                 $( '.balance' ).innerText = testnet_generator.satsToBitcoin( bal );
             }
-            $( '.generate_block' ).onclick = makeBlock;
-            var showAddress = () => {
-                var [ addy, privkey ] = testnet_generator.getAddy();
+            var showAddress = privkey => {
+                if ( privkey ) var [ addy, privkey ] = testnet_generator.getAddy( privkey );
+                else var [ addy, privkey ] = testnet_generator.getAddy();
                 $( '.your_addy' ).innerText = addy;
                 $( '.your_addy' ).setAttribute( "data-privkey", privkey );
             }
@@ -757,15 +872,55 @@
                 if ( unable ) return `unable`;
                 return set_to_return;
             }
-            showAddress();
-            var validateTx = async txhex => {
+            var privkey = params.hasOwnProperty( "privkey" ) ? params.privkey : undefined;
+            showAddress( privkey );
+            $( '.generate_block' ).onclick = () => {makeBlock();}
+            if ( !privkey ) $( '.generate_block' ).disabled = false;
+            if ( privkey ) testnet_generator.processExistingBlocks();
+            if ( params.hasOwnProperty( "pubkey" ) ) {
+                testnet_generator.processExistingBlocks();
+                $( '.generate_block' ).remove();
+                $( '.auto_gen' ).remove();
+                $( '.wallet' ).style.display = "none";
+                $( '.txs_in_mempool_label' ).style.display = "none";
+            }
+            var validateTx = async ( txhex, allow_zero_fee, parent_tx ) => {
                 var tx = null;
                 try {
                     tx = tapscript.Tx.decode( txhex );
                 } catch ( e ) {}
-                if ( !tx || typeof tx != "object" ) return 'that tx was invalid for unknown reasons';
+                if ( !tx || typeof tx != "object" ) return 'err 0, that tx was invalid for unknown reasons';
+                try {
+                    var sum_of_inputs = 0;
+                    tx.vin.forEach( input => {
+                        var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
+                        var input_to_work_with = testnet_generator.utxo_set[ input_id ];
+                        if ( !input_to_work_with && !!parent_tx ) {
+                            var txid_of_parent = tapscript.Tx.util.getTxid( parent_tx );
+                            if ( txid_of_parent === input[ "txid" ] ) {
+                                var parent_tx_to_work_with = tapscript.Tx.decode( parent_tx );
+                                if ( parent_tx_to_work_with.vout.length < input[ "vout" ] ) throw( 'input does not exist' );
+                                input_to_work_with = parent_tx_to_work_with.vout[ input[ "vout" ] ];
+                            }
+                        }
+                        var amnt = input_to_work_with.hasOwnProperty( "amnt" ) ? input_to_work_with.amnt : Number( input_to_work_with.value );
+                        sum_of_inputs = sum_of_inputs + amnt;
+                    });
+                    var sum_of_outputs = 0;
+                    tx.vout.forEach( output => sum_of_outputs = sum_of_outputs + Number( output[ "value" ] ) );
+                    var tx_fee_in_sats = sum_of_inputs - sum_of_outputs;
+                    var tx_size = txhex.length / 2;
+                    var feerate = Number( ( tx_fee_in_sats / tx_size ).toFixed( 2 ) );
+                } catch ( e ) {
+                    console.log( tx );
+                    return 'err 1, that tx was invalid for unknown reasons';
+                }
+                if ( feerate < 0 ) return 'nice try, attempting to print money via tx fees';
+                if ( feerate === 0 && !allow_zero_fee ) return 'that tx paid no fee';
+                if ( feerate < 1 && !allow_zero_fee ) return 'that tx paid a fee between 0 and 1 sat per byte, which is not allowed';
                 var input_that_isnt_real = -1;
                 var input_with_insufficient_witness_length = -1;
+                var input_with_too_many_witness_items = -1;
                 var input_with_invalid_sig = -1;
                 var input_whose_stack_is_too_small = -1;
                 var input_with_improperly_formatted_sig = -1;
@@ -792,15 +947,40 @@
                     var input_exists = false;
                     if ( input_id in testnet_generator.utxo_set ) input_exists = true;
                     else input_exists = false;
-                    if ( testnet_generator.utxo_set[ input_id ].spent ) input_exists = false;
-                    if ( !input_exists ) {
+                    var item = testnet_generator.utxo_set[ input_id ];
+                    if ( item && item.spent ) input_exists = false;
+                    var input_to_work_with = null;
+                    if ( !item && parent_tx ) {
+                        var txid_of_parent = tapscript.Tx.util.getTxid( parent_tx );
+                        if ( txid_of_parent === input[ "txid" ] ) {
+                            var parent_tx_to_work_with = tapscript.Tx.decode( parent_tx );
+                            if ( parent_tx_to_work_with.vout.length < input[ "vout" ] ) {
+                                input_that_isnt_real = index;
+                                break;
+                            }
+                            input_to_work_with = parent_tx_to_work_with.vout[ input[ "vout" ] ];
+                            input_to_work_with.addy = input_to_work_with.scriptPubKey;
+                            input_to_work_with.amnt = Number( input_to_work_with.value );
+                            input_to_work_with.block_created = Object.keys( testnet_generator.blocks ).length - 1;
+                            try {
+                                input_to_work_with.addy = tapscript.Address.fromScriptPubKey( input_to_work_with.addy );
+                            } catch( e ) {}
+                        }
+                    }
+                    if ( !input_exists && !input_to_work_with ) {
                         input_that_isnt_real = index;
                         break;
                     }
-                    var addy = testnet_generator.utxo_set[ input_id ].addy;
+                    if ( item ) input_to_work_with = item;
+                    var addy = input_to_work_with.addy;
+                    var amnt_to_use_in_moments = input_to_work_with.amnt;
+                    try {
+                        addy = tapscript.Address.fromScriptPubKey( addy, testnet_generator.addykind );
+                    } catch( e ) {}
+                    var scpk = testnet_generator.isValidAddress( addy ) ? tapscript.Address.toScriptPubKey( addy ) : addy;
                     tx.vin[ i ].prevout = {
-                        value: testnet_generator.utxo_set[ input_id ].amnt,
-                        scriptPubKey: tapscript.Address.toScriptPubKey( addy ),
+                        value: amnt_to_use_in_moments,
+                        scriptPubKey: scpk,
                     }
                 }
                 if ( input_that_isnt_real >= 0 ) return `that tx was invalid because input ${input_that_isnt_real} tries to spend a utxo that does not exist or is already spent by another transaction in the mempool`;
@@ -815,8 +995,14 @@
                     var input = tx.vin[ i ];
                     var index = i;
                     var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
-                    var addy = testnet_generator.utxo_set[ input_id ].addy;
-                    var type = tapscript.Address.decode( addy ).type;
+                    // var input_to_work_with_here = input_to_work_with ? input_to_work_with : item;
+                    // var addy = input_to_work_with_here.addy;
+                    var addy = input.prevout.scriptPubKey;
+                    var type = "p2tr";
+                    if ( addy !== "51024e73" ) {
+                        addy = testnet_generator.isValidAddress( addy ) ? addy : tapscript.Address.fromScriptPubKey( addy, testnet_generator.addykind );
+                        var type = tapscript.Address.decode( addy ).type;
+                    }
                     var sequence_binary = testnet_generator.hexToBinary( input.sequence );
                     var first_bit = Number( sequence_binary[ 0 ] );
                     var tenth_bit = Number( sequence_binary[ 9 ] );
@@ -824,7 +1010,7 @@
                     var sequence_value = null;
                     if ( !first_bit ) {
                         //the "disable flag" is not set so we are about to enforce the sequence number as a relative locktime
-                        var mined_in_block = testnet_generator.utxo_set[ input_id ].block_created;
+                        var mined_in_block = input_to_work_with.block_created;
                         var current_blockheight = Object.keys( testnet_generator.blocks ).length - 1;
                         sequence_value = input.sequence.substring( 4 );
                         if ( sequence_value.substring( 0, 2 ) != "00" ) {
@@ -866,8 +1052,17 @@
                         }
                     }
                     if ( type === "p2tr" ) {
+                        if ( addy === "51024e73" ) {
+                            //p2a addresses can't have witness items
+                            if ( input.witness.length ) {
+                                input_with_too_many_witness_items = index;
+                                break;
+                            }
+                            continue;
+                        }
                         //ensure at least one element exists on the witness stack
                         if ( !input.witness.length ) {
+                            console.log( input, addy );
                             input_with_insufficient_witness_length = index;
                             break;
                         }
@@ -1363,8 +1558,8 @@
                                     // console.log( params );
                                 }
                                 else if ( !ifs_stack.includes( false ) && element === "OP_2DROP" ) {
-                                    console.log( "before acting:" );
-                                    console.log( params );
+                                    // console.log( "before acting:" );
+                                    // console.log( params );
                                     if ( !params.length ) {
                                         input_whose_stack_is_too_small = index;
                                         return;
@@ -1379,8 +1574,8 @@
                                     params.reverse();
                                     params.splice( 0, 1 );
                                     params.reverse();
-                                    console.log( "results:" );
-                                    console.log( params );
+                                    // console.log( "results:" );
+                                    // console.log( params );
                                 }
                                 else if ( !ifs_stack.includes( false ) && element === "OP_1NEGATE" ) {
                                     params.push( -1 );
@@ -1789,8 +1984,8 @@
                                     params.push( copy_2 );
                                 }
                                 else if ( !ifs_stack.includes( false ) && element === "OP_2ROT" ) {
-                                    console.log( "before acting:" );
-                                    console.log( params );
+                                    // console.log( "before acting:" );
+                                    // console.log( params );
                                     if ( !params.length ) {
                                         input_whose_stack_is_too_small = index;
                                         return;
@@ -1845,8 +2040,8 @@
                                     params.push( item_6 );
                                     params.push( item_1 );
                                     params.push( item_2 );
-                                    console.log( "results:" );
-                                    console.log( params );
+                                    // console.log( "results:" );
+                                    // console.log( params );
                                 }
                                 else if ( !ifs_stack.includes( false ) && element === "OP_2SWAP" ) {
                                     if ( !params.length ) {
@@ -2363,10 +2558,111 @@
                 if ( input_whose_script_tried_to_get_a_nonexistent_element_from_the_stack >= 0 ) return `that tx was invalid because input ${input_whose_script_tried_to_get_a_nonexistent_element_from_the_stack} has a script that tried to get a nonexistent element from the stack`;
                 if ( input_whose_script_failed_relative_timelock >= 0 ) return `that tx was invalid because input ${input_whose_script_failed_relative_timelock} has a non-zero relative timelock in its sequence number, which means the tx must wait a certain amount of time after that input utxo gets mined, and not enough time has passed`;
             }
-            var broadcast = async txhex => {
-                if ( !txhex || typeof txhex === "object" ) txhex = $( '.tx_broadcaster' ).value;
-                var reason_why_tx_is_invalid = await validateTx( txhex );
-                if ( reason_why_tx_is_invalid ) return alert( reason_why_tx_is_invalid );
+            var processTxhex = txhex => {
+                var tx = tapscript.Tx.decode( txhex );
+                var txid = tapscript.Tx.util.getTxid( tx );
+                var i; for ( i=0; i<tx.vin.length; i++ ) {
+                    var input = tx.vin[ i ];
+                    var index = i;
+                    var input_exists = false;
+                    var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
+                    if ( testnet_generator.utxo_set.hasOwnProperty( input_id ) ) {
+                        if ( testnet_generator.utxo_set[ input_id ].spent ) continue;
+                        testnet_generator.utxo_set[ input_id ].spent = true;
+                        var addy = testnet_generator.utxo_set[ input_id ].addy;
+                        var spky = tapscript.Script.encode( addy ).hex.substring( 2 );
+                        testnet_generator.addresses[ spky ][ "sent" ].push( `${txid}_${i}` );
+                    }
+                }
+                var outputs_not_to_add = [];
+                tx.vout.forEach( ( output, vout ) => {
+                    if ( testnet_generator.utxo_set.hasOwnProperty( `${txid}_${vout}` ) ) {
+                        outputs_not_to_add.push( `${txid}_${vout}` );
+                        return;
+                    }
+                    testnet_generator.utxo_set[ `${txid}_${vout}` ] = {
+                        txid,
+                        vout,
+                        amnt: Number( output[ "value" ] ),
+                        addy: output.scriptPubKey,
+                        spent: false,
+                        txhex,
+                        idx: undefined,
+                        block_created: undefined,
+                        block_spent: undefined,
+                    }
+                });
+                var i; for ( i=0; i<tx.vout.length; i++ ) {
+                    var output = tx.vout[ i ];
+                    var addy = output.scriptPubKey;
+                    var output_id = `${txid}_${i}`;
+                    if ( outputs_not_to_add.includes( output_id ) ) continue;
+                    if ( !( addy in testnet_generator.addresses ) ) testnet_generator.addresses[ addy ] = {
+                        sent: [],
+                        received: [],
+                    }
+                    testnet_generator.addresses[ addy ][ "received" ].push( output_id );
+                }
+                calcBalance();
+                calcMempool();
+            }
+            var broadcast = async ( txhex, skip_validation ) => {
+                if ( !skip_validation ) {
+                    if ( !txhex || typeof txhex === "object" ) txhex = $( '.tx_broadcaster' ).value;
+                    var tx_array = txhex.split( "," );
+                    if ( tx_array.length > 2 ) return alert( `too many txs in this package -- only 2 are allowed` );
+                    if ( tx_array.length > 1 ) {
+                        var allow_zero_fee = true;
+                        var first_tx_is_invalid = await validateTx( tx_array[ 0 ], allow_zero_fee );
+                        if ( first_tx_is_invalid ) return alert( first_tx_is_invalid );
+                        var allow_zero_fee = false;
+                        var second_tx_is_invalid = await validateTx( tx_array[ 1 ], allow_zero_fee, tx_array[ 0 ] );
+                        if ( second_tx_is_invalid ) return console.log( second_tx_is_invalid );
+                        var parent_tx = tapscript.Tx.decode( tx_array[ 0 ] );
+                        var sum_of_parent_inputs = 0;
+                        var all_parents_confirmed = true;
+                        parent_tx.vin.forEach( input => {
+                            var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
+                            var input_to_work_with = testnet_generator.utxo_set[ input_id ];
+                            if ( input_to_work_with.block_created === undefined ) all_parents_confirmed = false;
+                            var amnt = input_to_work_with.amnt;
+                            sum_of_parent_inputs = sum_of_parent_inputs + amnt;
+                        });
+                        if ( !all_parents_confirmed ) return alert( 'you cannot broadcast this package because it tries to spend an unconfirmed output, which is not allowed' );
+                        var sum_of_parent_outputs = 0;
+                        parent_tx.vout.forEach( output => sum_of_parent_outputs = sum_of_parent_outputs + Number( output[ "value" ] ) );
+                        var parent_tx_fee_in_sats = sum_of_parent_inputs - sum_of_parent_outputs;
+                        var parent_tx_size = tx_array[ 0 ].length / 2;
+                        var child_tx = tapscript.Tx.decode( tx_array[ 1 ] );
+                        var sum_of_child_inputs = 0;
+                        child_tx.vin.forEach( input => {
+                            var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
+                            var input_to_work_with = testnet_generator.utxo_set[ input_id ];
+                            if ( !input_to_work_with && !!parent_tx ) {
+                                var txid_of_parent = tapscript.Tx.util.getTxid( parent_tx );
+                                if ( txid_of_parent === input[ "txid" ] ) {
+                                    input_to_work_with = parent_tx.vout[ input[ "vout" ] ];
+                                }
+                            }
+                            var amnt = input_to_work_with.hasOwnProperty( "amnt" ) ? input_to_work_with.amnt : Number( input_to_work_with.value );
+                            sum_of_child_inputs = sum_of_child_inputs + amnt;
+                        });
+                        var sum_of_child_outputs = 0;
+                        child_tx.vout.forEach( output => sum_of_child_outputs = sum_of_child_outputs + Number( output[ "value" ] ) );
+                        var child_tx_fee_in_sats = sum_of_child_inputs - sum_of_child_outputs;
+                        var child_tx_size = tx_array[ 1 ].length / 2;
+                        var total_fee = parent_tx_fee_in_sats + child_tx_fee_in_sats;
+                        var total_size = parent_tx_size + child_tx_size;
+                        var effective_fee_rate = total_fee / total_size;
+                        if ( effective_fee_rate < 1 ) return alert( 'the effective fee rate was less than 1 sat per byte, try again with a child that pays a larger fee' );
+                        var skip_validation = true;
+                        await broadcast( tapscript.Tx.encode( parent_tx ).hex, skip_validation );
+                        broadcast( tapscript.Tx.encode( child_tx ).hex, skip_validation );
+                        return;
+                    }
+                    var reason_why_tx_is_invalid = await validateTx( txhex );
+                    if ( reason_why_tx_is_invalid ) return alert( reason_why_tx_is_invalid );
+                }
                 testnet_generator.mempool.push( txhex );
                 var txid = tapscript.Tx.util.getTxid( txhex );
                 $( '.broadcast_success_label' ).classList.remove( "hidden" );
@@ -2377,42 +2673,7 @@
                     showPage( 'tx_explorer' );
                     testnet_generator.showSoloTx( txid, txhex, 1 );
                 };
-                var tx = tapscript.Tx.decode( txhex );
-                var txid = tapscript.Tx.util.getTxid( tx );
-                var i; for ( i=0; i<tx.vin.length; i++ ) {
-                    var input = tx.vin[ i ];
-                    var index = i;
-                    var input_exists = false;
-                    var input_id = `${input[ "txid" ]}_${input[ "vout" ]}`;
-                    testnet_generator.utxo_set[ input_id ].spent = true;
-                    var addy = testnet_generator.utxo_set[ input_id ].addy;
-                    testnet_generator.addresses[ addy ][ "sent" ].push( `${txid}_${i}` );
-                }
-                tx.vout.forEach( ( output, vout ) => {
-                    testnet_generator.utxo_set[ `${txid}_${vout}` ] = {
-                        txid,
-                        vout,
-                        amnt: Number( output[ "value" ] ),
-                        addy: tapscript.Address.fromScriptPubKey( output[ "scriptPubKey" ], "testnet" ),
-                        spent: false,
-                        txhex,
-                        idx: undefined,
-                        block_created: undefined,
-                        block_spent: undefined,
-                    }
-                });
-                var i; for ( i=0; i<tx.vout.length; i++ ) {
-                    var output = tx.vout[ i ];
-                    var addy = tapscript.Address.fromScriptPubKey( output[ "scriptPubKey" ], "testnet" );
-                    var output_id = `${txid}_${i}`;
-                    if ( !( addy in testnet_generator.addresses ) ) testnet_generator.addresses[ addy ] = {
-                        sent: [],
-                        received: [],
-                    }
-                    testnet_generator.addresses[ addy ][ "received" ].push( output_id );
-                }
-                calcBalance();
-                calcMempool();
+                processTxhex( txhex );
             }
             $( '.broadcast_btn' ).onclick = broadcast;
             var calcMempool = () => $( '.txs_in_mempool' ).innerText = testnet_generator.mempool.length;
@@ -2464,14 +2725,14 @@
                 });
                 console.log( tapscript.Tx.encode( txdata ).hex );
             }
-            $( '.auto_generate' ).onchange = () => {
+            if ( $( '.auto_generate' ) ) $( '.auto_generate' ).onchange = () => {
                 autogen_value = $( '.auto_generate' ).value;
                 if ( autogen_value.includes( "---" ) ) $( '.auto_go' ).disabled = true;
                 else $( '.auto_go' ).removeAttribute( "disabled" );
             }
             var autogen_num = null;
             var autogo = false;
-            $( '.auto_go' ).onclick = () => {
+            if ( $( '.auto_go' ) ) $( '.auto_go' ).onclick = () => {
                 if ( $( '.auto_go' ).innerText === "Go" ) {
                     if ( $( '.auto_go' ).disabled ) return;
                     autogen_value = $( '.auto_generate' ).value;
@@ -2509,11 +2770,103 @@
                 $( `.${page}` ).classList.remove( "hidden" );
             }
             (async()=>{
+                if ( !$( '.auto_generate' ) ) {
+                    window.scrollTo( 0, 0 );
+                    return;
+                }
                 $( '.auto_generate' ).value = "--- Auto generate ---";
                 $( '.auto_go' ).disabled = true;
                 $( '.tx_broadcaster' ).value = "";
                 window.scrollTo( 0, 0 );
             })();
         </script>
+        <script>
+            var useP2A = privkey_1 => {
+                if ( !privkey_1 ) {
+                    privkey_1 = testnet_generator.getPrivkey();
+                    var pubkey_1 = testnet_generator.getPubkey( privkey_1 );
+                    var address_1 = tapscript.Address.fromScriptPubKey( [ 1, pubkey_1 ], testnet_generator.addykind );
+                    console.log( `send money to this address:` );
+                    console.log( address_1 );
+                    console.log( `then run this command:` );
+                    console.log( `useP2A( "${privkey_1}" );` );
+                    alert( `follow the instructions in your browser console` );
+                    return;
+                }
+                var pubkey_1 = testnet_generator.getPubkey( privkey_1 );
+                var privkey_2 = testnet_generator.getPrivkey();
+                var pubkey_2 = testnet_generator.getPubkey( privkey_2 );
+                var address_1 = tapscript.Address.fromScriptPubKey( [ 1, pubkey_1 ], testnet_generator.addykind );
+                var address_2 = tapscript.Address.fromScriptPubKey( [ 1, pubkey_2 ], testnet_generator.addykind );
+                var txid = prompt( `enter the txid by which you sent money to the address` );
+                if ( !txid ) return;
+                var vout = Number( prompt( `and the vout` ) );
+                var amnt = Number( prompt( `and the amount` ) );
+                var destino = $( '.your_addy' ).innerText;
+                var using_p2a = true;
+                var tx_a = tapscript.Tx.create({
+                    version: 3,
+                    vin: [{
+                        txid,
+                        vout,
+                        prevout: {
+                            value: amnt,
+                            scriptPubKey: tapscript.Address.toScriptPubKey( address_1 ),
+                        }
+                    }],
+                    vout: [{
+                        value: amnt,
+                        scriptPubKey: tapscript.Address.toScriptPubKey( address_2 ),
+                    }],
+                });
+                if ( using_p2a ) {
+                    tx_a.vout.unshift({
+                        value: 240,
+                        scriptPubKey: "51024e73",
+                    });
+                    tx_a.vout[ 1 ].value = amnt - 240;
+                }
+                var sig_a = tapscript.Signer.taproot.sign( privkey_1, tx_a, 0 ).hex;
+                tx_a.vin[ 0 ].witness = [ sig_a ];
+                //create tx_b, which pays double fees to send from address_2 to anywhere
+                //ensure tx_b is a v3 transaction
+                var txid_a = tapscript.Tx.util.getTxid( tx_a );
+                var tx_b = tapscript.Tx.create({
+                    version: 3,
+                    vin: [{
+                        txid: txid_a,
+                        vout: 0,
+                        prevout: {
+                            value: amnt,
+                            scriptPubKey: tapscript.Address.toScriptPubKey( address_2 ),
+                        }
+                    }],
+                    vout: [{
+                        value: amnt - 1000,
+                        scriptPubKey: tapscript.Address.toScriptPubKey( destino ),
+                    }],
+                });
+                if ( using_p2a ) {
+                    tx_b.vin.unshift({
+                        txid: txid_a,
+                        vout: 0,
+                        prevout: {
+                            value: 240,
+                            scriptPubKey: "51024e73",
+                        }
+                    });
+                    tx_b.vin[ 1 ].vout = 1;
+                    tx_b.vin[ 1 ].prevout.value = amnt - 240;
+                }
+                var txid_b = tapscript.Tx.util.getTxid( tx_b );
+                var input_to_sign = 0;
+                if ( using_p2a ) input_to_sign = 1;
+                var sig_b = tapscript.Signer.taproot.sign( privkey_2, tx_b, input_to_sign ).hex;
+                tx_b.vin[ input_to_sign ].witness = [ sig_b ];
+                var txs = [ tapscript.Tx.encode( tx_a ).hex, tapscript.Tx.encode( tx_b ).hex ];
+                console.log( txs.join( "," ) );
+            }
+        </script>
     </body>
 </html>
+ 
