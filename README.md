@@ -23,7 +23,7 @@ Testnet generator fixes this problem by having the blockchain be lightweight eno
 
 Another frustration I have is with blocks that come too slowly. Most testnets use the same 10 minute blocktime bitcoin uses. Some are more "generous" and reduce the blocktime to 30 seconds. But that's not always good enough. If I'm testing something like a lightning force closure, you have to wait 2016 blocks before finalizing, and even with 30 second blocks, that means waiting about 17 hours to finalize the force closure. Too long. 
 
-Testnet generator fixes this problem by giving you a button to insta-mine a block. That way, if you need to wait 2016 blocks, you can just rapid-fire click it a couple thousand times and be on your way. (I should probably ease this further by adding a form that lets you specify how many blocks you want to mine per click.)
+Testnet generator fixes this problem by giving you a button to insta-mine a block. That way, if you need to wait 2016 blocks, you can just rapid-fire click it a couple thousand times and be on your way. (I should probably ease this further by adding a dropdown that lets you specify how many blocks you want to mine per click.)
 
 ## #3: Regtest sucks
 
