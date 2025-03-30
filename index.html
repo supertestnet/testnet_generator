@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
     <head>
@@ -128,7 +127,7 @@
                 justify-content: space-between;
             }
             .block_explorer, .tx, .input, .output,
-            .tx_explorer, .addy_explorer {
+            .tx_explorer, .addy_explorer, .btc_script {
                 border: 1px solid black;
                 border-radius: 1rem;
                 padding: 1rem;
@@ -168,6 +167,12 @@
             .grey {
                 background-color: #cccccc;
             }
+            .script_arguments_label, .script_program_label {
+                font-weight: bold;
+            }
+            .btc_script {
+                .margin-bottom: auto;
+            }
             @media screen and (max-width: 600px) {
             }
         </style>
@@ -202,9 +207,6 @@
             }
             .modal input, .modal textarea {
                 max-width: 90%;
-            }
-            .hidden {
-                display: none !important;
             }
         </style>
         <script>
@@ -446,7 +448,7 @@
                     var txid = tapscript.Tx.util.getTxid( tx );
                     var display_fee = !!idx ? "" : "hidden";
                     var tx_html = `
-                        <div class="tx ${background_color}">
+                        <div class="tx ${background_color} tx_${txid}">
                             <p>Tx: <span class="txnum">${idx}</span></p>
                             <div>Txid: <span class="txid txid_link" data-txhex="${txhex}" data-idx="${idx}">${txid}</span></div>
                             <div class="${display_fee}">Fee: <span class="fee">0</span> btc</div>
@@ -483,6 +485,21 @@
                                 <p>Amount sent from this address in this tx: <span class="amnt_sent">${testnet_generator.satsToBitcoin( amnt_sent )} btc</span></p>
                                 <p>Tx that originally created this input: <span class="input_txid txid_link" data-txhex="${input_txhex}" data-idx="${input_idx}">${input_txid}</span></p>
                                 <p>Vout of that tx: <span class="input_vout">${input[ "vout" ]}</span></p>
+                                <p><button class="view_script" onclick="testnet_generator.viewScript( '${input_txid}_${input[ "vout" ]}', '${txid}_${index}' );">View bitcoin script</button></p>
+                                <div class="btc_script hidden">
+                                    <p class="script_arguments_label">Arguments</p>
+                                    <div class="script_arguments">
+                                        ${JSON.stringify([
+                                            "placeholder_1",
+                                        ])}
+                                    </div>
+                                    <p class="script_program_label">Program</p>
+                                    <div class="script_program">
+                                        ${JSON.stringify([
+                                            "placeholder_2",
+                                        ])}
+                                    </div>
+                                </div>
                             </div>
                         `;
                     });
@@ -777,6 +794,7 @@
                         console.log( tx );
                         return 'err 1, that tx was invalid for unknown reasons';
                     }
+                    console.log( sum_of_inputs, sum_of_outputs, tx_size, feerate );
                     if ( feerate < 0 ) return 'nice try, attempting to print money via tx fees';
                     if ( feerate === 0 && !allow_zero_fee ) return 'that tx paid no fee';
                     if ( feerate < 1 && !allow_zero_fee ) return 'that tx paid a fee between 0 and 1 sat per byte, which is not allowed';
@@ -2611,6 +2629,7 @@
                                 testnet_generator.utxo_set[ input_id ].block_spent = num;
                             });
                             var sum_of_outputs = 0;
+                            console.log( txid, tx.vout.length );
                             tx.vout.forEach( ( output, index ) => {
                                 sum_of_outputs = sum_of_outputs + Number( output[ "value" ] );
                                 testnet_generator.utxo_set[ `${txid}_${index}` ] = {
@@ -2700,6 +2719,40 @@
                     testnet_generator.blocks_relayed.push( ...blocks_to_relay );
                     await testnet_generator.waitSomeTime( 2_000 );
                     testnet_generator.relayBlocks();
+                },
+                viewScript: async ( txid_and_vout_of_utxo_being_spent, txid_and_vout_in_which_it_is_spent ) => {
+                    var vout_of_utxo_being_spent = Number( txid_and_vout_of_utxo_being_spent.split( "_" )[ 1 ] );
+                    var txid_in_which_it_is_spent = txid_and_vout_in_which_it_is_spent.split( "_" )[ 0 ];
+                    var vout_in_which_it_is_spent = Number( txid_and_vout_in_which_it_is_spent.split( "_" )[ 1 ] );
+                    var spubkey_of_utxo_being_spent = tapscript.Tx.decode( testnet_generator.utxo_set[ txid_and_vout_of_utxo_being_spent ].txhex ).vout[ vout_of_utxo_being_spent ].scriptPubKey;
+                    var witness_of_utxo_being_spent = tapscript.Tx.decode( testnet_generator.utxo_set[ `${txid_in_which_it_is_spent}_0` ].txhex ).vin[ vout_in_which_it_is_spent ].witness;
+                    if ( !witness_of_utxo_being_spent.length ) {
+                        var script_arguments = [];
+                        var script_program = tapscript.Script.decode( spubkey_of_utxo_being_spent );
+                    }
+                    if ( witness_of_utxo_being_spent.length === 1 ) {
+                        var script_arguments = [ witness_of_utxo_being_spent[ 0 ] ];
+                        var script_program = [
+                            tapscript.Script.decode( spubkey_of_utxo_being_spent )[ 1 ],
+                            "OP_CHECKSIG",
+                        ];
+                    }
+                    if ( witness_of_utxo_being_spent.length > 1 ) {
+                        var script_arguments = JSON.parse( JSON.stringify( witness_of_utxo_being_spent ) );
+                        script_arguments.length = script_arguments.length - 2;
+                        var script_program = tapscript.Script.decode( witness_of_utxo_being_spent[ witness_of_utxo_being_spent.length - 2 ] );
+                    }
+                    var script_div = $$( `.tx_${txid_in_which_it_is_spent} .input .btc_script` )[ vout_in_which_it_is_spent ];
+                    var button = $$( `.tx_${txid_in_which_it_is_spent} .input .view_script` )[ vout_in_which_it_is_spent ];
+                    if ( script_div.classList.contains( "hidden" ) ) {
+                        script_div.classList.remove( "hidden" );
+                        button.innerText = "Hide bitcoin script";
+                        script_div.getElementsByClassName( "script_arguments" )[ 0 ].innerHTML = `<p class="script_element">${script_arguments.join( `</p><p class="script_element">` )}</p>`;
+                        script_div.getElementsByClassName( "script_program" )[ 0 ].innerHTML = `<p class="script_element">${script_program.join( `</p><p class="script_element">` )}</p>`;
+                    } else {
+                        script_div.classList.add( "hidden" );
+                        button.innerText = "Show bitcoin script";
+                    }
                 },
             }
             var sendMoney = () => {
