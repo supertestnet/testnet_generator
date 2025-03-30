@@ -794,7 +794,6 @@
                         console.log( tx );
                         return 'err 1, that tx was invalid for unknown reasons';
                     }
-                    console.log( sum_of_inputs, sum_of_outputs, tx_size, feerate );
                     if ( feerate < 0 ) return 'nice try, attempting to print money via tx fees';
                     if ( feerate === 0 && !allow_zero_fee ) return 'that tx paid no fee';
                     if ( feerate < 1 && !allow_zero_fee ) return 'that tx paid a fee between 0 and 1 sat per byte, which is not allowed';
