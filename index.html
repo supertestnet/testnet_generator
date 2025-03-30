@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
     <head>
@@ -440,6 +441,7 @@
                     return btc;
                 },
                 showTx: ( txhex, idx ) => {
+                    var unique = testnet_generator.getPrivkey();
                     if ( idx === undefined ) idx = 1;
                     var background_color = "pink";
                     if ( idx % 2 ) background_color = "lightblue";
@@ -448,7 +450,7 @@
                     var txid = tapscript.Tx.util.getTxid( tx );
                     var display_fee = !!idx ? "" : "hidden";
                     var tx_html = `
-                        <div class="tx ${background_color} tx_${txid}">
+                        <div class="tx ${background_color} tx_${txid} unique_${unique}">
                             <p>Tx: <span class="txnum">${idx}</span></p>
                             <div>Txid: <span class="txid txid_link" data-txhex="${txhex}" data-idx="${idx}">${txid}</span></div>
                             <div class="${display_fee}">Fee: <span class="fee">0</span> btc</div>
@@ -485,20 +487,12 @@
                                 <p>Amount sent from this address in this tx: <span class="amnt_sent">${testnet_generator.satsToBitcoin( amnt_sent )} btc</span></p>
                                 <p>Tx that originally created this input: <span class="input_txid txid_link" data-txhex="${input_txhex}" data-idx="${input_idx}">${input_txid}</span></p>
                                 <p>Vout of that tx: <span class="input_vout">${input[ "vout" ]}</span></p>
-                                <p><button class="view_script" onclick="testnet_generator.viewScript( '${input_txid}_${input[ "vout" ]}', '${txid}_${index}' );">View bitcoin script</button></p>
+                                <p><button class="view_script" onclick="testnet_generator.viewScript( '${input_txid}_${input[ "vout" ]}', '${txid}_${index}', '${unique}' );">View bitcoin script</button></p>
                                 <div class="btc_script hidden">
                                     <p class="script_arguments_label">Arguments</p>
-                                    <div class="script_arguments">
-                                        ${JSON.stringify([
-                                            "placeholder_1",
-                                        ])}
-                                    </div>
+                                    <div class="script_arguments"></div>
                                     <p class="script_program_label">Program</p>
-                                    <div class="script_program">
-                                        ${JSON.stringify([
-                                            "placeholder_2",
-                                        ])}
-                                    </div>
+                                    <div class="script_program"></div>
                                 </div>
                             </div>
                         `;
@@ -2720,7 +2714,7 @@
                     await testnet_generator.waitSomeTime( 2_000 );
                     testnet_generator.relayBlocks();
                 },
-                viewScript: async ( txid_and_vout_of_utxo_being_spent, txid_and_vout_in_which_it_is_spent ) => {
+                viewScript: async ( txid_and_vout_of_utxo_being_spent, txid_and_vout_in_which_it_is_spent, unique ) => {
                     var vout_of_utxo_being_spent = Number( txid_and_vout_of_utxo_being_spent.split( "_" )[ 1 ] );
                     var txid_in_which_it_is_spent = txid_and_vout_in_which_it_is_spent.split( "_" )[ 0 ];
                     var vout_in_which_it_is_spent = Number( txid_and_vout_in_which_it_is_spent.split( "_" )[ 1 ] );
@@ -2742,8 +2736,8 @@
                         script_arguments.length = script_arguments.length - 2;
                         var script_program = tapscript.Script.decode( witness_of_utxo_being_spent[ witness_of_utxo_being_spent.length - 2 ] );
                     }
-                    var script_div = $$( `.tx_${txid_in_which_it_is_spent} .input .btc_script` )[ vout_in_which_it_is_spent ];
-                    var button = $$( `.tx_${txid_in_which_it_is_spent} .input .view_script` )[ vout_in_which_it_is_spent ];
+                    var script_div = $$( `.unique_${unique} .input .btc_script` )[ vout_in_which_it_is_spent ];
+                    var button = $$( `.unique_${unique} .input .view_script` )[ vout_in_which_it_is_spent ];
                     if ( script_div.classList.contains( "hidden" ) ) {
                         script_div.classList.remove( "hidden" );
                         button.innerText = "Hide bitcoin script";
