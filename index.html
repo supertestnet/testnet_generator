@@ -1016,11 +1016,11 @@
                                             params.push( 0 );
                                         } else {
                                             var sigflag = 1; //sighash_all
-                                            if ( sig.length === 130 && sig.substring( 128 ) === "02" ) sigflag = 2; //sighash_single
-                                            if ( sig.length === 130 && sig.substring( 128 ) === "03" ) sigflag = 3; //sighash_none
+                                            if ( sig.length === 130 && sig.substring( 128 ) === "02" ) sigflag = 2; //sighash_none
+                                            if ( sig.length === 130 && sig.substring( 128 ) === "03" ) sigflag = 3; //sighash_single
                                             if ( sig.length === 130 && sig.substring( 128 ) === "81" ) sigflag = 128 | 1; //sighash_all | anyone_can_pay
-                                            if ( sig.length === 130 && sig.substring( 128 ) === "82" ) sigflag = 128 | 2; //sighash_single | anyone_can_pay
-                                            if ( sig.length === 130 && sig.substring( 128 ) === "83" ) sigflag = 128 | 3; //sighash_none | anyone_can_pay
+                                            if ( sig.length === 130 && sig.substring( 128 ) === "82" ) sigflag = 128 | 2; //sighash_none | anyone_can_pay
+                                            if ( sig.length === 130 && sig.substring( 128 ) === "83" ) sigflag = 128 | 3; //sighash_single | anyone_can_pay
                                             if ( sig.length === 130 ) sig = sig.substring( 0, 128 );
                                             if ( sigflag != 1 ) var sighash = tapscript.Signer.taproot.hash( tx, index, { extension: tapleaf, sigflag }).hex;
                                             else var sighash = tapscript.Signer.taproot.hash( tx, index, { extension: tapleaf } ).hex;
@@ -1060,11 +1060,11 @@
                                             return;
                                         } else {
                                             var sigflag = 1; //sighash_all
-                                            if ( sig.length === 130 && sig.substring( 128 ) === "02" ) sigflag = 2; //sighash_single
-                                            if ( sig.length === 130 && sig.substring( 128 ) === "03" ) sigflag = 3; //sighash_none
+                                            if ( sig.length === 130 && sig.substring( 128 ) === "02" ) sigflag = 2; //sighash_none
+                                            if ( sig.length === 130 && sig.substring( 128 ) === "03" ) sigflag = 3; //sighash_single
                                             if ( sig.length === 130 && sig.substring( 128 ) === "81" ) sigflag = 128 | 1; //sighash_all | anyone_can_pay
-                                            if ( sig.length === 130 && sig.substring( 128 ) === "82" ) sigflag = 128 | 2; //sighash_single | anyone_can_pay
-                                            if ( sig.length === 130 && sig.substring( 128 ) === "83" ) sigflag = 128 | 3; //sighash_none | anyone_can_pay
+                                            if ( sig.length === 130 && sig.substring( 128 ) === "82" ) sigflag = 128 | 2; //sighash_none | anyone_can_pay
+                                            if ( sig.length === 130 && sig.substring( 128 ) === "83" ) sigflag = 128 | 3; //sighash_single | anyone_can_pay
                                             if ( sig.length === 130 ) sig = sig.substring( 0, 128 );
                                             if ( sigflag != 1 ) var sighash = tapscript.Signer.taproot.hash( tx, index, { extension: tapleaf, sigflag }).hex;
                                             else var sighash = tapscript.Signer.taproot.hash( tx, index, { extension: tapleaf } ).hex;
@@ -1113,11 +1113,11 @@
                                             params.push( num_to_add_to );
                                         } else {
                                             var sigflag = 1; //sighash_all
-                                            if ( sig.length === 130 && sig.substring( 128 ) === "02" ) sigflag = 2; //sighash_single
-                                            if ( sig.length === 130 && sig.substring( 128 ) === "03" ) sigflag = 3; //sighash_none
+                                            if ( sig.length === 130 && sig.substring( 128 ) === "02" ) sigflag = 2; //sighash_none
+                                            if ( sig.length === 130 && sig.substring( 128 ) === "03" ) sigflag = 3; //sighash_single
                                             if ( sig.length === 130 && sig.substring( 128 ) === "81" ) sigflag = 128 | 1; //sighash_all | anyone_can_pay
-                                            if ( sig.length === 130 && sig.substring( 128 ) === "82" ) sigflag = 128 | 2; //sighash_single | anyone_can_pay
-                                            if ( sig.length === 130 && sig.substring( 128 ) === "83" ) sigflag = 128 | 3; //sighash_none | anyone_can_pay
+                                            if ( sig.length === 130 && sig.substring( 128 ) === "82" ) sigflag = 128 | 2; //sighash_none | anyone_can_pay
+                                            if ( sig.length === 130 && sig.substring( 128 ) === "83" ) sigflag = 128 | 3; //sighash_single | anyone_can_pay
                                             if ( sig.length === 130 ) sig = sig.substring( 0, 128 );
                                             if ( sigflag != 1 ) var sighash = tapscript.Signer.taproot.hash( tx, index, { extension: tapleaf, sigflag }).hex;
                                             else var sighash = tapscript.Signer.taproot.hash( tx, index, { extension: tapleaf } ).hex;
