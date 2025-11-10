@@ -2931,16 +2931,53 @@
                     var handleFunction = async message => {
                         var [ type, subId, event ] = JSON.parse( message.data );
                         if ( !event || event === true ) return;
-                        var content = await super_nostr.alt_decrypt( privkey, event.pubkey, event.content );
+                        var relay = testnet_generator.relays[ 0 ];
+                        var recipient = event.pubkey;
+                        var content = await super_nostr.alt_decrypt( privkey, recipient, event.content );
                         var json = JSON.parse( content );
                         if ( json.msg_type === "broadcast" ) {
                             var txhex = json.msg_value;
                             var txid_or_error = await testnet_generator.broadcast( txhex );
-                            var recipient = event.pubkey;
-                            var relay = testnet_generator.relays[ 0 ];
                             var message = JSON.stringify({
                                 msg_type: "broadcast_reply",
                                 msg_value: txid_or_error,
+                            });
+                            var emsg = await super_nostr.alt_encrypt( privkey, recipient, message );
+                            var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
+                            super_nostr.sendEvent( event, relay );
+                        }
+                        if ( json.msg_type === "utxos" ) {
+                            var address = json.msg_value;
+                            var spub = tapscript.Script.encode( tapscript.Address.toScriptPubKey( address ) ).hex.substring( 2 );
+                            var utxos = [];
+                            if ( testnet_generator.addresses.hasOwnProperty( spub ) ) {
+                                var utxo_types = Object.keys( testnet_generator.addresses[ spub ] );
+                                utxo_types.forEach( utxo_type => {
+                                    testnet_generator.addresses[ spub ][ utxo_type ].forEach( utxo => {
+                                        var utxo_info = testnet_generator.utxo_set[ utxo ];
+                                        var txid = utxo_info.txid;
+                                        var vout = utxo_info.vout;
+                                        var value = utxo_info.amnt;
+                                        if ( isNaN( utxo_info.block_created ) ) {
+                                            var status = {
+                                                confirmed: false,
+                                            }
+                                        } else {
+                                            var block_hash = testnet_generator.intToHex( utxo_info.block_created ).padStart( 64, "0" );
+                                            var status = {
+                                                confirmed: true,
+                                                block_height: utxo_info.block_created,
+                                                block_hash,
+                                                block_time: testnet_generator.blocks[ block_hash ].timestamp,
+                                            }
+                                        }
+                                        utxos.push({ txid, vout, status, value });
+                                    });
+                                });
+                            }
+                            var message = JSON.stringify({
+                                msg_type: "utxos_reply",
+                                msg_value: utxos,
                             });
                             var emsg = await super_nostr.alt_encrypt( privkey, recipient, message );
                             var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
