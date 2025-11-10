@@ -321,7 +321,7 @@
                 mempool: [],
                 utxos: {},
                 addresses: {},
-                relays: [ "wss://nostrue.com" ],
+                relays: [ "wss://no.str.cr" ],
                 blocks_relayed: [],
                 addykind: "testnet",
                 hexToBytes: hex => Uint8Array.from( hex.match( /.{1,2}/g ).map( byte => parseInt( byte, 16 ) ) ),
@@ -2444,14 +2444,14 @@
                     if ( !skip_validation ) {
                         if ( !txhex || typeof txhex === "object" ) txhex = $( '.tx_broadcaster' ).value;
                         var tx_array = txhex.split( "," );
-                        if ( tx_array.length > 2 ) return alert( `too many txs in this package -- only 2 are allowed` );
+                        if ( tx_array.length > 2 ) return `too many txs in this package -- only 2 are allowed`;
                         if ( tx_array.length > 1 ) {
                             var allow_zero_fee = true;
                             var first_tx_is_invalid = await testnet_generator.validateTx( tx_array[ 0 ], allow_zero_fee );
-                            if ( first_tx_is_invalid ) return alert( first_tx_is_invalid );
+                            if ( first_tx_is_invalid ) return first_tx_is_invalid;
                             var allow_zero_fee = false;
                             var second_tx_is_invalid = await testnet_generator.validateTx( tx_array[ 1 ], allow_zero_fee, tx_array[ 0 ] );
-                            if ( second_tx_is_invalid ) return console.log( second_tx_is_invalid );
+                            if ( second_tx_is_invalid ) return second_tx_is_invalid;
                             var parent_tx = tapscript.Tx.decode( tx_array[ 0 ] );
                             var sum_of_parent_inputs = 0;
                             var all_parents_confirmed = true;
@@ -2462,7 +2462,7 @@
                                 var amnt = input_to_work_with.amnt;
                                 sum_of_parent_inputs = sum_of_parent_inputs + amnt;
                             });
-                            if ( !all_parents_confirmed ) return alert( 'you cannot broadcast this package because it tries to spend an unconfirmed output, which is not allowed' );
+                            if ( !all_parents_confirmed ) return 'you cannot broadcast this package because it tries to spend an unconfirmed output, which is not allowed';
                             var sum_of_parent_outputs = 0;
                             parent_tx.vout.forEach( output => sum_of_parent_outputs = sum_of_parent_outputs + Number( output[ "value" ] ) );
                             var parent_tx_fee_in_sats = sum_of_parent_inputs - sum_of_parent_outputs;
@@ -2488,14 +2488,14 @@
                             var total_fee = parent_tx_fee_in_sats + child_tx_fee_in_sats;
                             var total_size = parent_tx_size + child_tx_size;
                             var effective_fee_rate = total_fee / total_size;
-                            if ( effective_fee_rate < 1 ) return alert( 'the effective fee rate was less than 1 sat per byte, try again with a child that pays a larger fee' );
+                            if ( effective_fee_rate < 1 ) return 'the effective fee rate was less than 1 sat per byte, try again with a child that pays a larger fee';
                             var skip_validation = true;
-                            await testnet_generator.broadcast( tapscript.Tx.encode( parent_tx ).hex, skip_validation );
+                            var txid = await testnet_generator.broadcast( tapscript.Tx.encode( parent_tx ).hex, skip_validation );
                             testnet_generator.broadcast( tapscript.Tx.encode( child_tx ).hex, skip_validation );
-                            return;
+                            return txid;
                         }
                         var reason_why_tx_is_invalid = await testnet_generator.validateTx( txhex );
-                        if ( reason_why_tx_is_invalid ) return alert( reason_why_tx_is_invalid );
+                        if ( reason_why_tx_is_invalid ) return reason_why_tx_is_invalid;
                     }
                     testnet_generator.mempool.push( txhex );
                     var txid = tapscript.Tx.util.getTxid( txhex );
@@ -2508,6 +2508,7 @@
                         testnet_generator.showSoloTx( txid, txhex, 1 );
                     };
                     testnet_generator.processTxhex( txhex );
+                    return txid;
                 },
                 showBlock: ( num, count ) => {
                     var div = document.createElement( "div" );
@@ -2754,7 +2755,7 @@
                     }
                 },
             }
-            var sendMoney = () => {
+            var sendMoney = async () => {
                 var destino = prompt( `enter the address you want to send money to` );
                 if ( !destino ) return;
                 var amnt = Number( prompt( `enter an amount of sats you want to send there` ) );
@@ -2783,7 +2784,8 @@
                     txdata.vin[ i ].witness = [ sig ];
                 }
                 var txhex = tapscript.Tx.encode( txdata ).hex;
-                testnet_generator.broadcast( txhex );
+                var error = await testnet_generator.broadcast( txhex );
+                if ( error.length !== 64 || !testnet_generator.isValidHex( error ) ) return alert( error );
                 //highlight the mempool count label
                 $( '.txs_in_mempool_label' ).style.backgroundColor = "pink";
                 setTimeout( () => {
@@ -2833,7 +2835,11 @@
                 $( '.wallet' ).style.display = "none";
                 $( '.txs_in_mempool_label' ).style.display = "none";
             }
-            $( '.broadcast_btn' ).onclick = testnet_generator.broadcast;
+            $( '.broadcast_btn' ).onclick = async () => {
+                var txhex = $( '.tx_broadcaster' ).value;
+                var error = await testnet_generator.broadcast( txhex );
+                if ( error.length !== 64 || !testnet_generator.isValidHex( error ) ) return alert( error );
+            }
             if ( $( '.auto_generate' ) ) $( '.auto_generate' ).onchange = () => {
                 autogen_value = $( '.auto_generate' ).value;
                 if ( autogen_value.includes( "---" ) ) $( '.auto_go' ).disabled = true;
@@ -2914,6 +2920,39 @@
                     }
                     await testnet_generator.waitSomeTime( 1_000 );
                     testnet_generator.processExistingBlocks();
+                    var listenFunction = async socket => {
+                        var subId = super_nostr.bytesToHex( crypto.getRandomValues( new Uint8Array( 8 ) ) );
+                        var filter  = {}
+                        filter.kinds = [ 4 ];
+                        filter.since = Math.floor( Date.now() / 1000 );
+                        var subscription = [ "REQ", subId, filter ];
+                        socket.send( JSON.stringify( subscription ) );
+                    }
+                    var handleFunction = async message => {
+                        var [ type, subId, event ] = JSON.parse( message.data );
+                        if ( !event || event === true ) return;
+                        var content = await super_nostr.alt_decrypt( privkey, event.pubkey, event.content );
+                        var json = JSON.parse( content );
+                        if ( json.msg_type === "broadcast" ) {
+                            var txhex = json.msg_value;
+                            var txid_or_error = await testnet_generator.broadcast( txhex );
+                            var recipient = event.pubkey;
+                            var relay = testnet_generator.relays[ 0 ];
+                            var message = JSON.stringify({
+                                msg_type: "broadcast_reply",
+                                msg_value: txid_or_error,
+                            });
+                            var emsg = await super_nostr.alt_encrypt( privkey, recipient, message );
+                            var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
+                            super_nostr.sendEvent( event, relay );
+                        }
+                    }
+                    var connection_id = await super_nostr.newPermanentConnection( testnet_generator.relays[ 0 ], listenFunction, handleFunction );
+                    console.log( 'connected!', connection_id );
+                    console.log( 'users can talk to me at this pubkey:' );
+                    console.log( pubkey );
+                    console.log( 'and this relay:' );
+                    console.log( testnet_generator.relays[ 0 ] );
                 }
                 if ( !$( '.auto_generate' ) ) {
                     window.scrollTo( 0, 0 );
@@ -2926,7 +2965,7 @@
             })();
         </script>
         <script>
-            var runScript = () => {
+            var runScript = async () => {
                 var keypairs = [testnet_generator.getAddy(), testnet_generator.getAddy(), testnet_generator.getAddy()];
                 var script = [
                     "OP_3",
@@ -2947,7 +2986,7 @@
                 var addy = tapscript.Address.p2tr.fromPubKey( tpubkey, 'testnet' );
                 console.log( 'send money to this address:' );
                 console.log( addy );
-                var txhex = sendMoney();
+                var txhex = await sendMoney();
                 if ( !testnet_generator.isValidHex( txhex ) ) return;
                 var txid = tapscript.Tx.util.getTxid( txhex );
                 var vout = 0;
@@ -3072,4 +3111,3 @@
         <div class="modal hidden"></div>
     </body>
 </html>
- 
