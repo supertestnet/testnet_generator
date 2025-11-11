@@ -6,8 +6,8 @@
         <script src="https://unpkg.com/@dashincubator/ripemd160/ripemd160.js"></script>
         <script src="https://supertestnet.github.io/bankify/super_nostr.js"></script>
         <script src="https://unpkg.com/@cmdcode/tapscript@1.4.0"></script>
-        <script src="https://bundle.run/noble-secp256k1@1.2.14"></script>
-<!--
+        <script src="https://bundle.run/noble-secp256k1@1.2.14"></script>   
+<!-- 
         <script src="file:///home/supertestnet/bitcoin_projects/testnet_generator/super_nostr.js"></script>
         <script src="file:///home/supertestnet/bitcoin_projects/testnet_generator/tapscript@1.5.3"></script>
         <script src="file:///home/supertestnet/bitcoin_projects/testnet_generator/noble-secp256k1@1.2.14"></script>
@@ -561,7 +561,7 @@
                         if ( block_mined_if_coinbase ) mined_in_block = block_mined_if_coinbase;
                         $( '.mined_in_block' ).innerHTML = `${mined_in_block}`;
                     }
-                    var tx_size = txhex.length / 2;
+                    var tx_size = tapscript.Tx.util.getTxSize( tapscript.Tx.create( txhex ) );
                     $( '.tx_size' ).innerText = `${tx_size} bytes`;
                     var sum_of_inputs = 0;
                     tx.vin.forEach( input => {
@@ -794,7 +794,7 @@
                         var sum_of_outputs = 0;
                         tx.vout.forEach( output => sum_of_outputs = sum_of_outputs + Number( output[ "value" ] ) );
                         var tx_fee_in_sats = sum_of_inputs - sum_of_outputs;
-                        var tx_size = txhex.length / 2;
+                        var tx_size = tapscript.Tx.util.getTxSize( tapscript.Tx.create( txhex ) );
                         var feerate = Number( ( tx_fee_in_sats / tx_size ).toFixed( 2 ) );
                     } catch ( e ) {
                         console.log( tx );
@@ -2472,7 +2472,7 @@
                             var sum_of_parent_outputs = 0;
                             parent_tx.vout.forEach( output => sum_of_parent_outputs = sum_of_parent_outputs + Number( output[ "value" ] ) );
                             var parent_tx_fee_in_sats = sum_of_parent_inputs - sum_of_parent_outputs;
-                            var parent_tx_size = tx_array[ 0 ].length / 2;
+                            var parent_tx_size = tapscript.Tx.util.getTxSize( tapscript.Tx.create( tx_array[ 0 ] ) );
                             var child_tx = tapscript.Tx.decode( tx_array[ 1 ] );
                             var sum_of_child_inputs = 0;
                             child_tx.vin.forEach( input => {
@@ -2490,7 +2490,7 @@
                             var sum_of_child_outputs = 0;
                             child_tx.vout.forEach( output => sum_of_child_outputs = sum_of_child_outputs + Number( output[ "value" ] ) );
                             var child_tx_fee_in_sats = sum_of_child_inputs - sum_of_child_outputs;
-                            var child_tx_size = tx_array[ 1 ].length / 2;
+                            var child_tx_size = tapscript.Tx.util.getTxSize( tapscript.Tx.create( tx_array[ 1 ] ) );
                             var total_fee = parent_tx_fee_in_sats + child_tx_fee_in_sats;
                             var total_size = parent_tx_size + child_tx_size;
                             var effective_fee_rate = total_fee / total_size;
