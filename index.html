@@ -4,9 +4,14 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, user-scalable=no">
         <script src="https://unpkg.com/@dashincubator/ripemd160/ripemd160.js"></script>
-        <script src="https://supertestnet.github.io/bankify/super_nostr.js"></script>
+
+<!--         <script src="https://supertestnet.github.io/bankify/super_nostr.js"></script>
         <script src="https://unpkg.com/@cmdcode/tapscript@1.4.0"></script>
         <script src="https://bundle.run/noble-secp256k1@1.2.14"></script>
+ -->
+        <script src="file:///home/supertestnet/bitcoin_projects/testnet_generator/super_nostr.js"></script>
+        <script src="file:///home/supertestnet/bitcoin_projects/testnet_generator/tapscript@1.5.3"></script>
+        <script src="file:///home/supertestnet/bitcoin_projects/testnet_generator/noble-secp256k1@1.2.14"></script>
         <style>
             * {
                 box-sizing: border-box;
@@ -321,7 +326,8 @@
                 mempool: [],
                 utxos: {},
                 addresses: {},
-                relays: [ "wss://no.str.cr" ],
+                // relays: [ "wss://no.str.cr" ],
+                relays: [ "ws://127.0.0.1:6969/" ],
                 blocks_relayed: [],
                 addykind: "testnet",
                 hexToBytes: hex => Uint8Array.from( hex.match( /.{1,2}/g ).map( byte => parseInt( byte, 16 ) ) ),
@@ -2516,6 +2522,10 @@
                         <div class="block">
                             <div class="block_inner">
                                 <div class="block_back"></div>
+                                <div class="block_test1" style="height: 2rem;background-color: #3953c6;aspect-ratio: 1;rotate: 45deg;border-left: 1px solid black;position: absolute;top: .47rem;left: 0.47rem;"></div>
+                                <div class="block_test2" style="height: 5.8rem;background-color: #3953c6;position: absolute;top: 1px;left: 1.5rem;width: 5.9rem;"></div>
+                                <div class="block_test3" style="height: 2.4rem;width:1px;background-color: black;rotate: 45deg;position: absolute;top: -.3rem;right: .85rem;"></div>
+                                <div class="block_test4" style="height: 2rem;background-color: #3953c6;aspect-ratio: 1;rotate: 45deg;border-right: 1px solid black;position: absolute;bottom: 2.50rem;right: 0.5rem;"></div>
                                 <div class="block_front"><div>tx count:<br>${count}</div></div>
                                 <div class="block_num">${num}</div>
                             </div>
@@ -2978,6 +2988,29 @@
                             var message = JSON.stringify({
                                 msg_type: "utxos_reply",
                                 msg_value: utxos,
+                            });
+                            var emsg = await super_nostr.alt_encrypt( privkey, recipient, message );
+                            var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
+                            super_nostr.sendEvent( event, relay );
+                        }
+                        if ( json.msg_type === "txraw" ) {
+                            var txid = json.msg_value;
+                            var txhex = 'tx not found';
+                            if ( testnet_generator.utxo_set.hasOwnProperty( `${txid}_0` ) ) {
+                                var { block_created, idx } = testnet_generator.utxo_set[ `${txid}_0` ];
+                                if ( isNaN( block_created ) ) {
+                                    testnet_generator.mempool.every( tx => {
+                                        if ( tapscript.Tx.util.getTxid( tx ) !== txid ) return true;
+                                        txhex = tx;
+                                    });
+                                } else {
+                                    var block_hash = testnet_generator.intToHex( block_created ).padStart( 64, "0" );
+                                    txhex = testnet_generator.blocks[ block_hash ].txs[ idx ];
+                                }
+                            }
+                            var message = JSON.stringify({
+                                msg_type: "txraw_reply",
+                                msg_value: txhex,
                             });
                             var emsg = await super_nostr.alt_encrypt( privkey, recipient, message );
                             var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
