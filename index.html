@@ -955,10 +955,33 @@
                             //if only one element exists on the witness stack, treat it as a sig and check that it is valid for the taproot address when treated as a pubkey
                             if ( input.witness.length === 1 ) {
                                 var sig = input.witness[ 0 ];
-                                var sighash = tapscript.Signer.taproot.hash( tx, index );
-                                var pubkey = tapscript.Address.decode( addy ).script[ 1 ];
-                                var sig_is_valid = await nobleSecp256k1.schnorr.verify( sig, sighash, pubkey );
-                                if ( !sig_is_valid ) input_with_invalid_sig = index;
+                                var sig_length_is_good = false;
+                                if ( sig.length === 128 || sig.length === 130 || !sig.length ) sig_length_is_good = true;
+                                if ( sig.length === 130 && sig.substring( 128 ) != "01" && sig.substring( 128 ) != "02" && sig.substring( 128 ) != "03" && sig.substring( 128 ) != "81" && sig.substring( 128 ) != "82" && sig.substring( 128 ) != "83" ) sig_length_is_good = false;
+                                if ( !sig_length_is_good || ( sig.length && !testnet_generator.isValidHex( sig ) ) ) {
+                                    input_with_improperly_formatted_sig = index;
+                                    return;
+                                }
+                                if ( !sig.length ) {
+                                    input_whose_script_failed_a_verify_opcode = index;
+                                    return;
+                                } else {
+                                    var sigflag = 1; //sighash_all
+                                    if ( sig.length === 130 && sig.substring( 128 ) === "02" ) sigflag = 2; //sighash_none
+                                    if ( sig.length === 130 && sig.substring( 128 ) === "03" ) sigflag = 3; //sighash_single
+                                    if ( sig.length === 130 && sig.substring( 128 ) === "81" ) sigflag = 128 | 1; //sighash_all | anyone_can_pay
+                                    if ( sig.length === 130 && sig.substring( 128 ) === "82" ) sigflag = 128 | 2; //sighash_none | anyone_can_pay
+                                    if ( sig.length === 130 && sig.substring( 128 ) === "83" ) sigflag = 128 | 3; //sighash_single | anyone_can_pay
+                                    if ( sig.length === 130 ) sig = sig.substring( 0, 128 );
+                                    if ( sigflag != 1 ) var sighash = tapscript.Signer.taproot.hash( tx, index, { sigflag }).hex;
+                                    else var sighash = tapscript.Signer.taproot.hash( tx, index );
+                                    var pubkey = tapscript.Address.decode( addy ).script[ 1 ];
+                                    var sig_is_valid = await nobleSecp256k1.schnorr.verify( sig, sighash, pubkey );
+                                    if ( !sig_is_valid ) {
+                                        input_with_invalid_sig = index;
+                                        return;
+                                    }
+                                }
                             } else {
                                 //if there are multiple elements on the witness stack, treat the second-to-last element as the script and execute it with the elements prior to that as params
                                 var script = input.witness[ input.witness.length - 2 ];
@@ -1018,7 +1041,10 @@
                                         var sig_length_is_good = false;
                                         if ( sig.length === 128 || sig.length === 130 || !sig.length ) sig_length_is_good = true;
                                         if ( sig.length === 130 && sig.substring( 128 ) != "01" && sig.substring( 128 ) != "02" && sig.substring( 128 ) != "03" && sig.substring( 128 ) != "81" && sig.substring( 128 ) != "82" && sig.substring( 128 ) != "83" ) sig_length_is_good = false;
-                                        if ( !sig_length_is_good || ( sig.length && !testnet_generator.isValidHex( sig ) ) ) input_with_improperly_formatted_sig = index;
+                                        if ( !sig_length_is_good || ( sig.length && !testnet_generator.isValidHex( sig ) ) ) {
+                                            input_with_improperly_formatted_sig = index;
+                                            return;
+                                        }
                                         if ( !sig.length ) {
                                             params.push( 0 );
                                         } else {
@@ -1061,7 +1087,10 @@
                                         var sig_length_is_good = false;
                                         if ( sig.length === 128 || sig.length === 130 || !sig.length ) sig_length_is_good = true;
                                         if ( sig.length === 130 && sig.substring( 128 ) != "01" && sig.substring( 128 ) != "02" && sig.substring( 128 ) != "03" && sig.substring( 128 ) != "81" && sig.substring( 128 ) != "82" && sig.substring( 128 ) != "83" ) sig_length_is_good = false;
-                                        if ( !sig_length_is_good || ( sig.length && !testnet_generator.isValidHex( sig ) ) ) input_with_improperly_formatted_sig = index;
+                                        if ( !sig_length_is_good || ( sig.length && !testnet_generator.isValidHex( sig ) ) ) {
+                                            input_with_improperly_formatted_sig = index;
+                                            return;
+                                        }
                                         if ( !sig.length ) {
                                             input_whose_script_failed_a_verify_opcode = index;
                                             return;
@@ -1114,7 +1143,10 @@
                                         var sig_length_is_good = false;
                                         if ( sig.length === 128 || sig.length === 130 || !sig.length ) sig_length_is_good = true;
                                         if ( sig.length === 130 && sig.substring( 128 ) != "01" && sig.substring( 128 ) != "02" && sig.substring( 128 ) != "03" && sig.substring( 128 ) != "81" && sig.substring( 128 ) != "82" && sig.substring( 128 ) != "83" ) sig_length_is_good = false;
-                                        if ( !sig_length_is_good || ( sig.length && !testnet_generator.isValidHex( sig ) ) ) input_with_improperly_formatted_sig = index;
+                                        if ( !sig_length_is_good || ( sig.length && !testnet_generator.isValidHex( sig ) ) ) {
+                                            input_with_improperly_formatted_sig = index;
+                                            return;
+                                        }
                                         // console.log( "num_to_add_to:", num_to_add_to, "pubkey:", pubkey, "sig:", sig );
                                         if ( !sig.length ) {
                                             params.push( num_to_add_to );
