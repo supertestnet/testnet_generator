@@ -3004,7 +3004,7 @@
                         var subId = super_nostr.bytesToHex( crypto.getRandomValues( new Uint8Array( 8 ) ) );
                         var filter  = {}
                         filter.kinds = [ 4 ];
-                        filter[ "e" ] = [ pubkey ];
+                        filter[ "#p" ] = [ pubkey ];
                         filter.since = Math.floor( Date.now() / 1000 );
                         var subscription = [ "REQ", subId, filter ];
                         socket.send( JSON.stringify( subscription ) );
