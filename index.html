@@ -107,6 +107,43 @@
             .block_front div {
                 width: 100%;
             }
+            .block_side1 {
+                height: 2rem;
+                background-color: #02078e;
+                aspect-ratio: 1;
+                rotate: 45deg;
+                border-left: 1px solid black;
+                position: absolute;
+                top: .47rem;
+                left: 0.47rem;
+            }
+            .block_side2 {
+                height: 5.8rem;
+                background-color: #02078e;
+                position: absolute;
+                top: 1px;
+                left: 1.5rem;
+                width: 5.9rem;
+            }
+            .block_side3 {
+                height: 2.4rem;
+                width:1px;
+                background-color: black;
+                rotate: 45deg;
+                position: absolute;
+                top: -.3rem;
+                right: .85rem;
+            }
+            .block_side4 {
+                height: 2rem;
+                background-color: #02078e;
+                aspect-ratio: 1;
+                rotate: 45deg;
+                border-right: 1px solid black;
+                position: absolute;
+                bottom: 2.50rem;
+                right: 0.5rem;
+            }
             .block_num {
                 position: absolute;
                 bottom: 0rem;
@@ -2555,10 +2592,10 @@
                         <div class="block">
                             <div class="block_inner">
                                 <div class="block_back"></div>
-                                <div class="block_test1" style="height: 2rem;background-color: #3953c6;aspect-ratio: 1;rotate: 45deg;border-left: 1px solid black;position: absolute;top: .47rem;left: 0.47rem;"></div>
-                                <div class="block_test2" style="height: 5.8rem;background-color: #3953c6;position: absolute;top: 1px;left: 1.5rem;width: 5.9rem;"></div>
-                                <div class="block_test3" style="height: 2.4rem;width:1px;background-color: black;rotate: 45deg;position: absolute;top: -.3rem;right: .85rem;"></div>
-                                <div class="block_test4" style="height: 2rem;background-color: #3953c6;aspect-ratio: 1;rotate: 45deg;border-right: 1px solid black;position: absolute;bottom: 2.50rem;right: 0.5rem;"></div>
+                                <div class="block_side1"></div>
+                                <div class="block_side2"></div>
+                                <div class="block_side3"></div>
+                                <div class="block_side4"></div>
                                 <div class="block_front"><div>tx count:<br>${count}</div></div>
                                 <div class="block_num">${num}</div>
                             </div>
