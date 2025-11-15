@@ -1010,12 +1010,14 @@
                                     if ( sig.length === 130 && sig.substring( 128 ) === "83" ) sigflag = 128 | 3; //sighash_single | anyone_can_pay
                                     if ( sig.length === 130 ) sig = sig.substring( 0, 128 );
                                     if ( sigflag != 1 ) var sighash = tapscript.Signer.taproot.hash( tx, index, { sigflag }).hex;
-                                    else var sighash = tapscript.Signer.taproot.hash( tx, index );
+                                    else var sighash = tapscript.Signer.taproot.hash( tx, index ).hex;
+                                    tx.vin.forEach( ( vin, index ) => tx.vin[ index ].prevout.value = Number( vin.prevout.value ) );
+                                    tx.vout.forEach( ( vout, index ) => tx.vout[ index ].value = Number( vout.value ) );
                                     var pubkey = tapscript.Address.decode( addy ).script[ 1 ];
                                     var sig_is_valid = await nobleSecp256k1.schnorr.verify( sig, sighash, pubkey );
                                     if ( !sig_is_valid ) {
                                         input_with_invalid_sig = index;
-                                        return 'that tx was invalid because it had a sig that failed an implicit verify opcode (the stack only had a single sig on it, and in that case the sig must validate, which is what op_verify ensures)';
+                                        return `that tx was invalid because input ${i} had a sig that failed an implicit verify opcode (the stack only had a single sig on it, and in that case the sig must validate, which is what op_verify ensures)`;
                                     }
                                 }
                             } else {
