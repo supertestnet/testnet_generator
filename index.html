@@ -599,7 +599,6 @@
                         $( '.mined_in_block' ).innerHTML = `${mined_in_block}`;
                     }
                     var tx_size = tapscript.Tx.util.getTxSize( txhex ).vsize;
-                    console.log( tx_size, txhex );
                     $( '.tx_size' ).innerText = `${tx_size} bytes`;
                     var sum_of_inputs = 0;
                     tx.vin.forEach( input => {
@@ -838,7 +837,7 @@
                         console.log( tx );
                         return 'err 1, that tx was invalid for unknown reasons';
                     }
-                    if ( feerate < 0 ) return 'nice try, attempting to print money via tx fees';
+                    if ( feerate < 0 ) return 'that tx had more money in its outputs than its inputs, which is not allowed -- no printing money!';
                     if ( feerate === 0 && !allow_zero_fee ) return 'that tx paid no fee';
                     if ( feerate < 1 && !allow_zero_fee ) return 'that tx paid a fee between 0 and 1 sat per byte, which is not allowed';
                     var input_that_isnt_real = -1;
@@ -997,11 +996,11 @@
                                 if ( sig.length === 130 && sig.substring( 128 ) != "01" && sig.substring( 128 ) != "02" && sig.substring( 128 ) != "03" && sig.substring( 128 ) != "81" && sig.substring( 128 ) != "82" && sig.substring( 128 ) != "83" ) sig_length_is_good = false;
                                 if ( !sig_length_is_good || ( sig.length && !testnet_generator.isValidHex( sig ) ) ) {
                                     input_with_improperly_formatted_sig = index;
-                                    return;
+                                    return 'that tx was invalid because it had an improperly formatted sig';
                                 }
                                 if ( !sig.length ) {
-                                    input_whose_script_failed_a_verify_opcode = index;
-                                    return;
+                                    input_with_improperly_formatted_sig = index;
+                                    return 'that tx was invalid because it had an improperly formatted sig';
                                 } else {
                                     var sigflag = 1; //sighash_all
                                     if ( sig.length === 130 && sig.substring( 128 ) === "02" ) sigflag = 2; //sighash_none
@@ -1016,7 +1015,7 @@
                                     var sig_is_valid = await nobleSecp256k1.schnorr.verify( sig, sighash, pubkey );
                                     if ( !sig_is_valid ) {
                                         input_with_invalid_sig = index;
-                                        return;
+                                        return 'that tx was invalid because it had a sig that failed an implicit verify opcode (the stack only had a single sig on it, and in that case the sig must validate, which is what op_verify ensures)';
                                     }
                                 }
                             } else {
@@ -3015,6 +3014,7 @@
                         var relay = testnet_generator.relays[ 0 ];
                         var recipient = event.pubkey;
                         var content = await super_nostr.alt_decrypt( privkey, recipient, event.content );
+                        console.log( content );
                         var json = JSON.parse( content );
                         if ( json.msg_type === "broadcast" ) {
                             var txhex = json.msg_value;
