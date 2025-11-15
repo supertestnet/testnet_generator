@@ -4,14 +4,14 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, user-scalable=no">
         <script src="https://unpkg.com/@dashincubator/ripemd160/ripemd160.js"></script>
+<!-- 
         <script src="https://supertestnet.github.io/bankify/super_nostr.js"></script>
         <script src="https://unpkg.com/@cmdcode/tapscript@1.4.0"></script>
         <script src="https://bundle.run/noble-secp256k1@1.2.14"></script>
-<!-- 
+-->
         <script src="file:///home/supertestnet/bitcoin_projects/testnet_generator/super_nostr.js"></script>
         <script src="file:///home/supertestnet/bitcoin_projects/testnet_generator/tapscript@1.5.3"></script>
         <script src="file:///home/supertestnet/bitcoin_projects/testnet_generator/noble-secp256k1@1.2.14"></script>
--->
         <style>
             * {
                 box-sizing: border-box;
@@ -363,8 +363,8 @@
                 mempool: [],
                 utxos: {},
                 addresses: {},
-                relays: [ "wss://no.str.cr" ],
-                // relays: [ "ws://127.0.0.1:6969/" ],
+                // relays: [ "wss://no.str.cr" ],
+                relays: [ "ws://127.0.0.1:6969/" ],
                 blocks_relayed: [],
                 addykind: "testnet",
                 hexToBytes: hex => Uint8Array.from( hex.match( /.{1,2}/g ).map( byte => parseInt( byte, 16 ) ) ),
@@ -3110,6 +3110,17 @@
                             var message = JSON.stringify({
                                 msg_type: "genblock_reply",
                                 msg_value: blockhash,
+                            });
+                            var emsg = await super_nostr.alt_encrypt( privkey, recipient, message );
+                            var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
+                            super_nostr.sendEvent( event, relay );
+                        }
+                        if ( json.msg_type === "send" ) {
+                            var { destino, amnt, feerate } = json.msg_value;
+                            var txhex_or_error = await sendMoney( destino, amnt, feerate );
+                            var message = JSON.stringify({
+                                msg_type: "send_reply",
+                                msg_value: txhex_or_error,
                             });
                             var emsg = await super_nostr.alt_encrypt( privkey, recipient, message );
                             var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
