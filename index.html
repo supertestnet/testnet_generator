@@ -369,6 +369,12 @@
                 addykind: "testnet",
                 hexToBytes: hex => Uint8Array.from( hex.match( /.{1,2}/g ).map( byte => parseInt( byte, 16 ) ) ),
                 bytesToHex: bytes => bytes.reduce( ( str, byte ) => str + byte.toString( 16 ).padStart( 2, "0" ), "" ),
+                hexToText: hex => {
+                    var bytes = new Uint8Array( Math.ceil( hex.length / 2 ) );
+                    var i; for ( i=0; i<hex.length; i++ ) bytes[ i ] = parseInt( hex.substr( i * 2, 2 ), 16 );
+                    var text = new TextDecoder().decode( bytes );
+                    return text;
+                },
                 getPrivkey: () => testnet_generator.bytesToHex( nobleSecp256k1.utils.randomPrivateKey() ),
                 getPubkey: privkey => nobleSecp256k1.getPublicKey( privkey, true ).substring( 2 ),
                 getAddy: privkey => {
@@ -2836,45 +2842,50 @@
                     }
                 },
             }
-            var sendMoney = async () => {
-                var destino = prompt( `enter the address you want to send money to` );
-                if ( !destino ) return;
-                var amnt = Number( prompt( `enter an amount of sats you want to send there` ) );
-                if ( !amnt ) return;
-                var feerate = Number( prompt( `enter the feerate you want to use` ) );
-                if ( !feerate ) return;
-                var txfee = 300 * feerate;
-                var input_ids = getUtxos( amnt + txfee );
-                if ( input_ids === "unable" ) return alert( `you don't have enough money, consider generating some blocks` );
-                var inputs = [];
-                input_ids.forEach( utxo_id => inputs.push( testnet_generator.utxos[ utxo_id ] ) );
-                var vin = [];
-                inputs.forEach( input => vin.push( testnet_generator.getVin( input[ "txid" ], input[ "vout" ], input[ "amnt" ], input[ "addy" ] ) ) );
-                var txdata = tapscript.Tx.create({
-                    vin,
-                    vout: [testnet_generator.getVout( amnt, destino )],
-                });
-                var sum_of_inputs = 0;
-                inputs.forEach( input => sum_of_inputs = sum_of_inputs + input[ "amnt" ] );
-                var change = sum_of_inputs - amnt - txfee;
-                var change_addy = $( '.your_addy' ).innerText;
-                if ( change > 330 ) txdata.vout.push( testnet_generator.getVout( change, change_addy ) );
-                var i; for ( i=0; i<txdata.vin.length; i++ ) {
-                    var privkey = inputs[ i ][ "skey" ];
-                    var sig = tapscript.Signer.taproot.sign( privkey, txdata, i ).hex;
-                    txdata.vin[ i ].witness = [ sig ];
+            if ( params.hasOwnProperty( "relays" ) ) testnet_generator.relays = JSON.parse( testnet_generator.hexToText( params.relays ) );
+            var sendMoney = async ( destino, amnt, feerate ) => {
+                try {
+                    if ( !destino ) destino = prompt( `enter the address you want to send money to` );
+                    if ( !destino ) return;
+                    if ( !amnt ) amnt = Number( prompt( `enter an amount of sats you want to send there` ) );
+                    if ( !amnt ) return;
+                    if ( !feerate ) feerate = Number( prompt( `enter the feerate you want to use` ) );
+                    if ( !feerate ) return;
+                    var txfee = 300 * feerate;
+                    var input_ids = getUtxos( amnt + txfee );
+                    if ( input_ids === "unable" ) return `you don't have enough money, consider generating some blocks`;
+                    var inputs = [];
+                    input_ids.forEach( utxo_id => inputs.push( testnet_generator.utxos[ utxo_id ] ) );
+                    var vin = [];
+                    inputs.forEach( input => vin.push( testnet_generator.getVin( input[ "txid" ], input[ "vout" ], input[ "amnt" ], input[ "addy" ] ) ) );
+                    var txdata = tapscript.Tx.create({
+                        vin,
+                        vout: [testnet_generator.getVout( amnt, destino )],
+                    });
+                    var sum_of_inputs = 0;
+                    inputs.forEach( input => sum_of_inputs = sum_of_inputs + input[ "amnt" ] );
+                    var change = sum_of_inputs - amnt - txfee;
+                    var change_addy = $( '.your_addy' ).innerText;
+                    if ( change > 330 ) txdata.vout.push( testnet_generator.getVout( change, change_addy ) );
+                    var i; for ( i=0; i<txdata.vin.length; i++ ) {
+                        var privkey = inputs[ i ][ "skey" ];
+                        var sig = tapscript.Signer.taproot.sign( privkey, txdata, i ).hex;
+                        txdata.vin[ i ].witness = [ sig ];
+                    }
+                    var txhex = tapscript.Tx.encode( txdata ).hex;
+                    var error = await testnet_generator.broadcast( txhex );
+                    if ( error.length !== 64 || !testnet_generator.isValidHex( error ) ) return error;
+                    //highlight the mempool count label
+                    $( '.txs_in_mempool_label' ).style.backgroundColor = "pink";
+                    setTimeout( () => {
+                        $( '.txs_in_mempool_label' ).style.transition = "all 1s ease-in";
+                        $( '.txs_in_mempool_label' ).style.backgroundColor = "white";
+                    }, 10 );
+                    testnet_generator.calcMempool();
+                    return txhex;
+                } catch ( e ) {
+                    return 'unknown error';
                 }
-                var txhex = tapscript.Tx.encode( txdata ).hex;
-                var error = await testnet_generator.broadcast( txhex );
-                if ( error.length !== 64 || !testnet_generator.isValidHex( error ) ) return alert( error );
-                //highlight the mempool count label
-                $( '.txs_in_mempool_label' ).style.backgroundColor = "pink";
-                setTimeout( () => {
-                    $( '.txs_in_mempool_label' ).style.transition = "all 1s ease-in";
-                    $( '.txs_in_mempool_label' ).style.backgroundColor = "white";
-                }, 10 );
-                testnet_generator.calcMempool();
-                return txhex;
             }
             var getUtxos = amount => {
                 var utxo_set = [];
@@ -2904,7 +2915,10 @@
                 $( '.your_addy' ).innerText = addy;
                 $( '.your_addy' ).setAttribute( "data-privkey", privkey );
             }
-            $( '.send_btn' ).onclick = sendMoney;
+            $( '.send_btn' ).onclick = async () => {
+                var txhex_or_error = await sendMoney();
+                if ( !testnet_generator.isValidHex( txhex_or_error ) ) alert( txhex_or_error );
+            }
             var privkey = params.hasOwnProperty( "privkey" ) ? params.privkey : undefined;
             showAddress( privkey );
             $( '.generate_block' ).onclick = () => {testnet_generator.makeBlock();}
@@ -3066,7 +3080,7 @@
                             var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
                             super_nostr.sendEvent( event, relay );
                         }
-                        if ( json.msg_type === "txraw" ) {
+                        if ( json.msg_type === "rawtx" ) {
                             var txid = json.msg_value;
                             var txhex = 'tx not found';
                             if ( testnet_generator.utxo_set.hasOwnProperty( `${txid}_0` ) ) {
@@ -3082,8 +3096,20 @@
                                 }
                             }
                             var message = JSON.stringify({
-                                msg_type: "txraw_reply",
+                                msg_type: "rawtx_reply",
                                 msg_value: txhex,
+                            });
+                            var emsg = await super_nostr.alt_encrypt( privkey, recipient, message );
+                            var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
+                            super_nostr.sendEvent( event, relay );
+                        }
+                        if ( json.msg_type === "genblock" ) {
+                            var txid_or_error = await testnet_generator.makeBlock();
+                            var blockheight = Object.keys( testnet_generator.blocks ).length - 1;
+                            var blockhash = testnet_generator.intToHex( blockheight ).padStart( 64, "0" );
+                            var message = JSON.stringify({
+                                msg_type: "genblock_reply",
+                                msg_value: blockhash,
                             });
                             var emsg = await super_nostr.alt_encrypt( privkey, recipient, message );
                             var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
