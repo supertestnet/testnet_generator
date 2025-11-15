@@ -837,13 +837,14 @@
                         var sum_of_outputs = 0;
                         tx.vout.forEach( output => sum_of_outputs = sum_of_outputs + Number( output[ "value" ] ) );
                         var tx_fee_in_sats = sum_of_inputs - sum_of_outputs;
+                        if ( tx_fee_in_sats < 0 ) return `that tx had more money in its outputs than its inputs, which is not allowed -- no printing money! (specifically, that tx had ${sum_of_inputs} sats in its inputs and ${sum_of_outputs} sats in its outputs)`;
                         var tx_size = tapscript.Tx.util.getTxSize( txhex ).vsize;
                         var feerate = Number( ( tx_fee_in_sats / tx_size ).toFixed( 2 ) );
                     } catch ( e ) {
                         console.log( tx );
                         return 'err 1, that tx was invalid for unknown reasons';
                     }
-                    if ( feerate < 0 ) return 'that tx had more money in its outputs than its inputs, which is not allowed -- no printing money!';
+                    if ( feerate < 0 ) return `nice try, attempting to print money via tx fees! But it didn't work, your tx is invalid`;
                     if ( feerate === 0 && !allow_zero_fee ) return 'that tx paid no fee';
                     if ( feerate < 1 && !allow_zero_fee ) return 'that tx paid a fee between 0 and 1 sat per byte, which is not allowed';
                     var input_that_isnt_real = -1;
