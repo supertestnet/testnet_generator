@@ -3,6 +3,9 @@
 // https://bundle.run/noble-secp256k1@1.2.14
 var chain_client = {
     connection_info: null,
+    most_recent_fulfilled_command: null,
+    // base_url: `https://supertestnet.github.io/testnet_generator/`,
+    base_url: `file:///home/supertestnet/bitcoin_projects/testnet_generator/testnet_generator.html`,
     getPrivkey: () => window.crypto.getRandomValues( new Uint8Array( 32 ) ).toHex(),
     getPubkey: privkey => nobleSecp256k1.getPublicKey( privkey, true ).substring( 2 ),
     waitSomeTime: num => new Promise( resolve => setTimeout( resolve, num ) ),
@@ -19,8 +22,8 @@ var chain_client = {
             var pubkey = chain_client.getPubkey( privkey );
             var hex_relays = chain_client.textToHex( JSON.stringify( relays ) );
             var iframe = document.createElement( "iframe" );
-            // iframe.src = `https://supertestnet.github.io/testnet_generator/#privkey=${privkey}#relays=${hex_relays}#say_when_connected=${say_when_connected}`;
-            iframe.src = `file:///home/supertestnet/bitcoin_projects/testnet_generator/testnet_generator.html#privkey=${privkey}#relays=${hex_relays}#say_when_connected=${say_when_connected}`;
+            // iframe.src = `${chain_client.base_url}#privkey=${privkey}#relays=${hex_relays}#say_when_connected=${say_when_connected}`;
+            iframe.src = `${chain_client.base_url}#privkey=${privkey}#relays=${hex_relays}#say_when_connected=${say_when_connected}`;
             iframe.style.display = "none";
             iframe.className = `chain_client_network_${privkey}`;
             document.body.append( iframe );
@@ -63,10 +66,10 @@ var chain_client = {
             var relays = [ relay ];
             var hex_relays = chain_client.textToHex( JSON.stringify( relays ) );
             var iframe = document.createElement( "iframe" );
-            // if ( privkey ) iframe.src = `https://supertestnet.github.io/testnet_generator/#privkey=${privkey}#relays=${hex_relays}#say_when_connected=${say_when_connected}`;
-            // else iframe.src = `https://supertestnet.github.io/testnet_generator/#pubkey=${pubkey}#relays=${hex_relays}#say_when_connected=${say_when_connected}`;
-            if ( privkey ) iframe.src = `file:///home/supertestnet/bitcoin_projects/testnet_generator/testnet_generator.html#privkey=${privkey}#relays=${hex_relays}`;
-            else iframe.src = `file:///home/supertestnet/bitcoin_projects/testnet_generator/testnet_generator.html#pubkey=${pubkey}#relays=${hex_relays}`;
+            // if ( privkey ) iframe.src = `${chain_client.base_url}#privkey=${privkey}#relays=${hex_relays}#say_when_connected=${say_when_connected}`;
+            // else iframe.src = `${chain_client.base_url}#pubkey=${pubkey}#relays=${hex_relays}#say_when_connected=${say_when_connected}`;
+            if ( privkey ) iframe.src = `${chain_client.base_url}#privkey=${privkey}#relays=${hex_relays}`;
+            else iframe.src = `${chain_client.base_url}#pubkey=${pubkey}#relays=${hex_relays}`;
             iframe.style.display = "none";
             iframe.className = `chain_client_network_${privkey || pubkey}`;
             document.body.append( iframe );
@@ -145,6 +148,7 @@ var chain_client = {
     commander: async ( network, command, params ) => {
         if ( typeof network === "object" ) var commander = chain_client.createCommander( network );
         var reply = await commander( command, params );
+        chain_client.most_recent_fulfilled_command = [ command, reply ];
         return reply;
     },
 }
