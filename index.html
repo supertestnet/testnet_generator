@@ -363,8 +363,8 @@
                 mempool: [],
                 utxos: {},
                 addresses: {},
-                relays: [ "wss://no.str.cr" ],
-                // relays: [ "ws://127.0.0.1:6969/" ],
+                // relays: [ "wss://no.str.cr" ],
+                relays: [ "ws://127.0.0.1:6969/" ],
                 blocks_relayed: [],
                 addykind: "testnet",
                 hexToBytes: hex => Uint8Array.from( hex.match( /.{1,2}/g ).map( byte => parseInt( byte, 16 ) ) ),
@@ -3129,6 +3129,8 @@
                         }
                     }
                     var connection_id = await super_nostr.newPermanentConnection( testnet_generator.relays[ 0 ], listenFunction, handleFunction );
+                    var event = await super_nostr.prepEvent( privkey, "", 54091, [ [ "e", params.say_when_connected ] ] );
+                    super_nostr.sendEvent( event, testnet_generator.relays[ 0 ] );
                     console.log( 'connected!', connection_id );
                     console.log( 'users can talk to me at this pubkey:' );
                     console.log( pubkey );
