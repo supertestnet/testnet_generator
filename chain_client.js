@@ -4,8 +4,8 @@
 var chain_client = {
     connection_info: null,
     most_recent_fulfilled_command: null,
-    // base_url: `https://supertestnet.github.io/testnet_generator/`,
-    base_url: `file:///home/supertestnet/bitcoin_projects/testnet_generator/testnet_generator.html`,
+    base_url: `https://supertestnet.github.io/testnet_generator/`,
+    // base_url: `file:///home/supertestnet/bitcoin_projects/testnet_generator/testnet_generator.html`,
     getPrivkey: () => window.crypto.getRandomValues( new Uint8Array( 32 ) ).toHex(),
     getPubkey: privkey => nobleSecp256k1.getPublicKey( privkey, true ).substring( 2 ),
     waitSomeTime: num => new Promise( resolve => setTimeout( resolve, num ) ),
