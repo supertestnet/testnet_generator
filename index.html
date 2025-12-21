@@ -3127,6 +3127,16 @@
                             var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
                             super_nostr.sendEvent( event, relay );
                         }
+                        if ( json.msg_type === "blockheight" ) {
+                            var blockheight = Object.keys( testnet_generator.blocks ).length;
+                            var message = JSON.stringify({
+                                msg_type: "blockheight_reply",
+                                msg_value: blockheight,
+                            });
+                            var emsg = await super_nostr.alt_encrypt( privkey, recipient, message );
+                            var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
+                            super_nostr.sendEvent( event, relay );
+                        }
                     }
                     var connection_id = await super_nostr.newPermanentConnection( testnet_generator.relays[ 0 ], listenFunction, handleFunction );
                     var event = await super_nostr.prepEvent( privkey, "", 54091, [ [ "e", params.say_when_connected ] ] );
