@@ -2584,7 +2584,7 @@
                     }
                     if ( privkey ) {
                         var event = await super_nostr.prepEvent( privkey, "", 40427 );
-                        super_nostr.sendEvent( event, relay );
+                        super_nostr.sendEvent( event, testnet_generator.relays[ 0 ] );
                     }
                     testnet_generator.mempool.push( txhex );
                     var txid = tapscript.Tx.util.getTxid( txhex );
