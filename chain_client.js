@@ -4,8 +4,9 @@
 var chain_client = {
     connection_info: null,
     most_recent_fulfilled_command: null,
-    base_url: `https://supertestnet.github.io/testnet_generator/`,
-    // base_url: `file:///home/supertestnet/bitcoin_projects/testnet_generator/testnet_generator.html`,
+    // base_url: `https://supertestnet.github.io/testnet_generator/`,
+    base_url: `file:///home/supertestnet/bitcoin_projects/testnet_generator/testnet_generator.html`,
+    main_connection: null,
     getPrivkey: () => window.crypto.getRandomValues( new Uint8Array( 32 ) ).toHex(),
     getPubkey: privkey => nobleSecp256k1.getPublicKey( privkey, true ).substring( 2 ),
     waitSomeTime: num => new Promise( resolve => setTimeout( resolve, num ) ),
@@ -46,6 +47,7 @@ var chain_client = {
                 resolve( [ privkey, network_string ] );
             }
             var connection_id = await super_nostr.newPermanentConnection( relays[ 0 ], listenFunction, handleFunction );
+            chain_client.main_connection = connection_id;
 
             //shut down
             var loop = async () => {
@@ -113,12 +115,20 @@ var chain_client = {
                 item_listened_for = json.msg_value;
             }
             var connection_id = await super_nostr.newPermanentConnection( relay, listenFunction, handleFunction );
+            chain_client.main_connection = connection_id;
 
             //send command
             var msg = JSON.stringify({msg_type: command, msg_value: params});
             var emsg = await super_nostr.alt_encrypt( privkey, miner, msg );
             var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", miner ] ] );
-            super_nostr.sendEvent( event, relay );
+            var socket = super_nostr.sockets[ chain_client.main_connection ].socket;
+            var loop = async () => {
+                if ( socket.readyState === 1 ) return;
+                await chain_client.waitSomeTime( 10 );
+                return loop();
+            }
+            await loop();
+            super_nostr.sendEvent( event, socket );
 
             //listen for reply
             var loop = async () => {
