@@ -2718,7 +2718,6 @@
                                 testnet_generator.utxo_set[ input_id ].block_spent = num;
                             });
                             var sum_of_outputs = 0;
-                            console.log( txid, tx.vout.length );
                             tx.vout.forEach( ( output, index ) => {
                                 sum_of_outputs = sum_of_outputs + Number( output[ "value" ] );
                                 testnet_generator.utxo_set[ `${txid}_${index}` ] = {
