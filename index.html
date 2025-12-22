@@ -7,6 +7,7 @@
         <script src="https://supertestnet.github.io/bankify/super_nostr.js"></script>
         <script src="https://unpkg.com/@cmdcode/tapscript@1.4.0"></script>
         <script src="https://bundle.run/noble-secp256k1@1.2.14"></script>
+        <script src="https://supertestnet.github.io/testnet_generator/chain_client.js"></script>
 <!-- 
         <script src="file:///home/supertestnet/bitcoin_projects/testnet_generator/ripemd160.js"></script>
         <script src="file:///home/supertestnet/bitcoin_projects/testnet_generator/super_nostr.js"></script>
@@ -2935,10 +2936,16 @@
                 $( '.wallet' ).style.display = "none";
                 $( '.txs_in_mempool_label' ).style.display = "none";
             }
+            $( '.tx_broadcaster' ).value = "";
             $( '.broadcast_btn' ).onclick = async () => {
                 var txhex = $( '.tx_broadcaster' ).value;
-                var error = await testnet_generator.broadcast( txhex );
-                if ( error.length !== 64 || !testnet_generator.isValidHex( error ) ) return alert( error );
+                if ( params.pubkey ) {
+                    var txid_or_error = await chain_client.commander( [ params.pubkey, testnet_generator.relays[ 0 ] ], "broadcast", txhex );
+                    if ( txid_or_error.length !== 64 || !testnet_generator.isValidHex( txid_or_error ) ) return alert( txid_or_error );
+                } else {
+                    var error = await testnet_generator.broadcast( txhex );
+                    if ( error.length !== 64 || !testnet_generator.isValidHex( error ) ) return alert( error );
+                }
             }
             if ( $( '.auto_generate' ) ) $( '.auto_generate' ).onchange = () => {
                 autogen_value = $( '.auto_generate' ).value;
