@@ -3036,6 +3036,10 @@
                         if ( json.msg_type === "broadcast" ) {
                             var txhex = json.msg_value;
                             var txid_or_error = await testnet_generator.broadcast( txhex );
+                            if ( testnet_generator.isValidHex( txid_or_error ) ) {
+                                var event = await super_nostr.prepEvent( privkey, "", 40427 );
+                                super_nostr.sendEvent( event, relay );
+                            }
                             var message = JSON.stringify({
                                 msg_type: "broadcast_reply",
                                 msg_value: txid_or_error,
