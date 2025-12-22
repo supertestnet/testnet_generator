@@ -3036,8 +3036,8 @@
                         if ( json.msg_type === "broadcast" ) {
                             var txhex = json.msg_value;
                             var txid_or_error = await testnet_generator.broadcast( txhex );
-                            if ( testnet_generator.isValidHex( txid_or_error ) ) {
-                                var event = await super_nostr.prepEvent( privkey, "", 40427 );
+                            if ( testnet_generator.isValidHex( txid_or_error ) && params.hasOwnProperty( "say_when_connected" ) ) {
+                                var event = await super_nostr.prepEvent( privkey, "", 40427, [ [ "e", params.say_when_connected ] ] );
                                 super_nostr.sendEvent( event, relay );
                             }
                             var message = JSON.stringify({
