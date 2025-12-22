@@ -3049,28 +3049,26 @@
                             var spub = tapscript.Script.encode( tapscript.Address.toScriptPubKey( address ) ).hex.substring( 2 );
                             var utxos = [];
                             if ( testnet_generator.addresses.hasOwnProperty( spub ) ) {
-                                var utxo_types = Object.keys( testnet_generator.addresses[ spub ] );
-                                utxo_types.forEach( utxo_type => {
-                                    testnet_generator.addresses[ spub ][ utxo_type ].forEach( utxo => {
-                                        var utxo_info = testnet_generator.utxo_set[ utxo ];
-                                        var txid = utxo_info.txid;
-                                        var vout = utxo_info.vout;
-                                        var value = utxo_info.amnt;
-                                        if ( isNaN( utxo_info.block_created ) ) {
-                                            var status = {
-                                                confirmed: false,
-                                            }
-                                        } else {
-                                            var block_hash = testnet_generator.intToHex( utxo_info.block_created ).padStart( 64, "0" );
-                                            var status = {
-                                                confirmed: true,
-                                                block_height: utxo_info.block_created,
-                                                block_hash,
-                                                block_time: testnet_generator.blocks[ block_hash ].timestamp,
-                                            }
+                                testnet_generator.addresses[ spub ][ "received" ].forEach( utxo => {
+                                    var utxo_info = testnet_generator.utxo_set[ utxo ];
+                                    if ( utxo_info.spent ) return;
+                                    var txid = utxo_info.txid;
+                                    var vout = utxo_info.vout;
+                                    var value = utxo_info.amnt;
+                                    if ( isNaN( utxo_info.block_created ) ) {
+                                        var status = {
+                                            confirmed: false,
                                         }
-                                        utxos.push({ txid, vout, status, value });
-                                    });
+                                    } else {
+                                        var block_hash = testnet_generator.intToHex( utxo_info.block_created ).padStart( 64, "0" );
+                                        var status = {
+                                            confirmed: true,
+                                            block_height: utxo_info.block_created,
+                                            block_hash,
+                                            block_time: testnet_generator.blocks[ block_hash ].timestamp,
+                                        }
+                                    }
+                                    utxos.push({ txid, vout, status, value });
                                 });
                             }
                             var message = JSON.stringify({
