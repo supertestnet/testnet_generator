@@ -3091,6 +3091,19 @@
                             var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
                             super_nostr.sendEvent( event, relay );
                         }
+                        if ( json.msg_type === "spend_txs" ) {
+                            var address = json.msg_value;
+                            var spub = tapscript.Script.encode( tapscript.Address.toScriptPubKey( address ) ).hex.substring( 2 );
+                            var spend_txs = [];
+                            if ( testnet_generator.addresses.hasOwnProperty( spub ) ) testnet_generator.addresses[ spub ][ "sent" ].forEach( outpoint => spend_txs.push( outpoint ) );
+                            var message = JSON.stringify({
+                                msg_type: "spend_txs_reply",
+                                msg_value: spend_txs,
+                            });
+                            var emsg = await super_nostr.alt_encrypt( privkey, recipient, message );
+                            var event = await super_nostr.prepEvent( privkey, emsg, 4, [ [ "p", recipient ] ] );
+                            super_nostr.sendEvent( event, relay );
+                        }
                         if ( json.msg_type === "rawtx" ) {
                             var txid = json.msg_value;
                             var txhex = 'tx not found';
