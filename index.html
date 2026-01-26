@@ -3152,7 +3152,7 @@
                         }
                         if ( json.msg_type === "blockheight" ) {
                             var txid = json.msg_value;
-                            if ( txid ) var blockheight = testnet_generator.utxo_set[ `${txid}_0` ].block_created;
+                            if ( txid ) var blockheight = testnet_generator.utxo_set[ `${txid}_0` ].block_created ? testnet_generator.utxo_set[ `${txid}_0` ].block_created : "unconfirmed";
                             else var blockheight = Object.keys( testnet_generator.blocks ).length;
                             var message = JSON.stringify({
                                 msg_type: "blockheight_reply",
