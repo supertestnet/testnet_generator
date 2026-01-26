@@ -3151,7 +3151,9 @@
                             super_nostr.sendEvent( event, relay );
                         }
                         if ( json.msg_type === "blockheight" ) {
-                            var blockheight = Object.keys( testnet_generator.blocks ).length;
+                            var txid = json.msg_value;
+                            if ( txid ) var blockheight = testnet_generator.utxo_set[ `${txid}_0` ].block_created;
+                            else var blockheight = Object.keys( testnet_generator.blocks ).length;
                             var message = JSON.stringify({
                                 msg_type: "blockheight_reply",
                                 msg_value: blockheight,
