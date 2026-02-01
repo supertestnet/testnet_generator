@@ -2575,7 +2575,7 @@
                             var total_fee = parent_tx_fee_in_sats + child_tx_fee_in_sats;
                             var total_size = parent_tx_size + child_tx_size;
                             var effective_fee_rate = total_fee / total_size;
-                            if ( effective_fee_rate < 1 ) return 'the effective fee rate was less than 1 sat per byte, try again with a child that pays a larger fee';
+                            if ( effective_fee_rate < 1 ) return `The effective fee rate was less than 1 sat per byte. The parent was ${parent_tx_size} bytes and the child was ${child_tx_size} bytes, or ${total_size} bytes total, and when you divide that into the total fee, which was ${total_fee} sats, the result is ${effective_fee_rate} sats per byte, which is less than 1. Try again with a child that pays a larger fee`;
                             var skip_validation = true;
                             var txid = await testnet_generator.broadcast( tapscript.Tx.encode( parent_tx ).hex, skip_validation );
                             testnet_generator.broadcast( tapscript.Tx.encode( child_tx ).hex, skip_validation );
